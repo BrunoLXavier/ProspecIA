@@ -1,0 +1,219 @@
+{
+  "fontes_fomento": [
+    {
+      "id": "f1",
+      "nome": "FINEP Inovação 2026",
+      "tipo": "Subvenção",
+      "setores": ["TI", "Saúde"],
+      "trl_min": 3,
+      "trl_max": 7,
+      "valor": 100000000,
+      "prazo_dias": 90,
+      "status": "ativa"
+    },
+    {
+      "id": "f2",
+      "nome": "BNDES Fundo Clima",
+      "tipo": "Empréstimo",
+      "setores": ["Energia", "Agricultura"],
+      "trl_min": 5,
+      "trl_max": 9,
+      "valor": 50000000,
+      "prazo_dias": 120,
+      "status": "ativa"
+    },
+    {
+      "id": "f3",
+      "nome": "CNPq Chamada Universal",
+      "tipo": "Edital",
+      "setores": ["Todos"],
+      "trl_min": 1,
+      "trl_max": 4,
+      "valor": 20000000,
+      "prazo_dias": 60,
+      "status": "ativa"
+    },
+    {
+      "id": "f4",
+      "nome": "FAPESP Inovação Tecnológica",
+      "tipo": "Subvenção",
+      "setores": ["TI", "Manufatura"],
+      "trl_min": 4,
+      "trl_max": 8,
+      "valor": 30000000,
+      "prazo_dias": 150,
+      "status": "ativa"
+    },
+    {
+      "id": "f5",
+      "nome": "Embrapii Projetos Cooperativos",
+      "tipo": "Subvenção",
+      "setores": ["Manufatura", "Energia"],
+      "trl_min": 5,
+      "trl_max": 7,
+      "valor": 15000000,
+      "prazo_dias": 45,
+      "status": "ativa"
+    }
+  ],
+  "institutos": [
+    {
+      "id": "i1",
+      "nome": "Instituto SENAI de Inovação em Sistemas Embarcados",
+      "localizacao": {
+        "regiao": "Sudeste",
+        "estado": "SP",
+        "cidade": "São Paulo"
+      },
+      "setores": ["TI", "Manufatura"],
+      "tipo": "Público",
+      "contato": "contato@senaisp.edu.br",
+      "capacidade_investimento": 5000000
+    },
+    {
+      "id": "i2",
+      "nome": "Instituto de Pesquisas Energéticas e Nucleares",
+      "localizacao": {
+        "regiao": "Sudeste",
+        "estado": "SP",
+        "cidade": "São Paulo"
+      },
+      "setores": ["Energia"],
+      "tipo": "Público",
+      "contato": "ipen@ipen.br",
+      "capacidade_investimento": 10000000
+    },
+    {
+      "id": "i3",
+      "nome": "Embrapa Agricultura Digital",
+      "localizacao": {
+        "regiao": "Sudeste",
+        "estado": "SP",
+        "cidade": "Campinas"
+      },
+      "setores": ["Agricultura", "TI"],
+      "tipo": "Público",
+      "contato": "agricultura.digital@embrapa.br",
+      "capacidade_investimento": 8000000
+    }
+  ],
+  "clientes": [
+    {
+      "id": "c1",
+      "nome": "Tech Innovations Ltda",
+      "cnpj": "12.345.678/0001-90",
+      "setor": "TI",
+      "maturidade": "Candidato",
+      "contatos": [
+        {
+          "nome": "João Silva",
+          "cargo": "CTO",
+          "email": "joao@techinnovations.com.br",
+          "telefone": "(11) 98765-4321"
+        }
+      ]
+    },
+    {
+      "id": "c2",
+      "nome": "Saúde Tech Brasil",
+      "cnpj": "23.456.789/0001-01",
+      "setor": "Saúde",
+      "maturidade": "Engajado",
+      "contatos": [
+        {
+          "nome": "Maria Santos",
+          "cargo": "CEO",
+          "email": "maria@saudetech.com.br",
+          "telefone": "(11) 91234-5678"
+        }
+      ]
+    },
+    {
+      "id": "c3",
+      "nome": "Agro Futuro S.A.",
+      "cnpj": "34.567.890/0001-12",
+      "setor": "Agricultura",
+      "maturidade": "Exploratório",
+      "contatos": [
+        {
+          "nome": "Carlos Oliveira",
+          "cargo": "Diretor de Inovação",
+          "email": "carlos@agrofuturo.com.br",
+          "telefone": "(19) 99876-5432"
+        }
+      ]
+    },
+    {
+      "id": "c4",
+      "nome": "Energia Limpa do Brasil",
+      "cnpj": "45.678.901/0001-23",
+      "setor": "Energia",
+      "maturidade": "Candidato",
+      "contatos": [
+        {
+          "nome": "Ana Costa",
+          "cargo": "Gerente de P&D",
+          "email": "ana@energialimpa.com.br",
+          "telefone": "(21) 97654-3210"
+        }
+      ]
+    },
+    {
+      "id": "c5",
+      "nome": "Manufatura Inteligente Ltda",
+      "cnpj": "56.789.012/0001-34",
+      "setor": "Manufatura",
+      "maturidade": "Engajado",
+      "contatos": [
+        {
+          "nome": "Pedro Almeida",
+          "cargo": "Diretor Industrial",
+          "email": "pedro@manufaturainteligente.com.br",
+          "telefone": "(11) 96543-2109"
+        }
+      ]
+    }
+  ],
+  "oportunidades": [
+    {
+      "id": "o1",
+      "cliente_id": "c1",
+      "fonte_id": "f1",
+      "estagio": "Validação",
+      "score": 85,
+      "responsavel": "admin@prospecai.com.br"
+    },
+    {
+      "id": "o2",
+      "cliente_id": "c2",
+      "fonte_id": "f1",
+      "estagio": "Abordagem",
+      "score": 78,
+      "responsavel": "gestor@prospecai.com.br"
+    },
+    {
+      "id": "o3",
+      "cliente_id": "c3",
+      "fonte_id": "f2",
+      "estagio": "Inteligência",
+      "score": 65,
+      "responsavel": "analista@prospecai.com.br"
+    },
+    {
+      "id": "o4",
+      "cliente_id": "c4",
+      "fonte_id": "f2",
+      "estagio": "Registro",
+      "score": 90,
+      "responsavel": "admin@prospecai.com.br"
+    },
+    {
+      "id": "o5",
+      "cliente_id": "c5",
+      "fonte_id": "f4",
+      "estagio": "Conversão",
+      "score": 92,
+      "responsavel": "gestor@prospecai.com.br"
+    }
+  ]
+}

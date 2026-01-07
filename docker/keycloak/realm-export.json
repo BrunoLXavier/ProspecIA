@@ -1,0 +1,117 @@
+{
+  "realm": "prospecai",
+  "enabled": true,
+  "displayName": "ProspecIA",
+  "displayNameHtml": "<strong>ProspecIA</strong> - Gestão de Inovação",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrador do sistema com acesso total"
+      },
+      {
+        "name": "gestor",
+        "description": "Gestor com permissões de gerenciamento"
+      },
+      {
+        "name": "analista",
+        "description": "Analista com permissões de leitura e escrita"
+      },
+      {
+        "name": "viewer",
+        "description": "Visualizador com permissões somente leitura"
+      }
+    ]
+  },
+  
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@prospecai.com.br",
+      "firstName": "Admin",
+      "lastName": "ProspecIA",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "gestor",
+      "email": "gestor@prospecai.com.br",
+      "firstName": "Gestor",
+      "lastName": "Test",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "gestor123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["gestor"]
+    },
+    {
+      "username": "analista",
+      "email": "analista@prospecai.com.br",
+      "firstName": "Analista",
+      "lastName": "Test",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "analista123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["analista"]
+    }
+  ],
+  
+  "clients": [
+    {
+      "clientId": "prospecai-backend",
+      "name": "ProspecIA Backend API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "prospecai-backend-secret",
+      "redirectUris": ["http://localhost:8000/*"],
+      "webOrigins": ["http://localhost:8000"]
+    },
+    {
+      "clientId": "prospecai-frontend",
+      "name": "ProspecIA Frontend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"]
+    }
+  ]
+}
