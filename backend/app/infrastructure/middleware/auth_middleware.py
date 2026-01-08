@@ -301,12 +301,30 @@ def get_current_user(request: Request) -> Dict[str, Any]:
     Raises:
         HTTPException: If user not found in request state
     """
-    if not hasattr(request.state, "user"):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not authenticated",
-        )
-    return request.state.user
+    if hasattr(request.state, "user"):
+        return request.state.user
+
+    # Fallback for tests/dev when middleware isn't installed and JWT isn't required
+    try:
+        from app.infrastructure.config.settings import get_settings
+        settings = get_settings()
+        if not settings.FEATURE_JWT_REQUIRED:
+            return {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "sub": "00000000-0000-0000-0000-000000000000",
+                "username": "dev-user",
+                "roles": ["admin", "gestor", "analista"],
+                "tenant_id": "nacional",
+                "email_verified": True,
+            }
+    except Exception:
+        # If settings cannot be loaded, continue to raise 401
+        pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="User not authenticated",
+    )
 
 
 def require_roles(*required_roles: str):

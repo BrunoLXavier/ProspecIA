@@ -45,12 +45,19 @@ class LGPDAgent:
         self.model = None
         self._load_model()
         
-        # Regex patterns for Brazilian documents
+        # Regex patterns for Brazilian documents and PII
         self.cpf_pattern = re.compile(r'\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b')
         self.cnpj_pattern = re.compile(r'\b\d{2}\.?\d{3}\.?\d{3}/?0001-?\d{2}\b')
         self.rg_pattern = re.compile(r'\b\d{1,2}\.?\d{3}\.?\d{3}-?[0-9X]\b')
+        self.pis_pattern = re.compile(r'\b\d{3}\.?\d{5}\.?\d{2}-?\d{1}\b')  # PIS/PASEP pattern
         self.email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
         self.phone_pattern = re.compile(r'\b(?:\+55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}\b')
+        # Date of birth pattern (DD/MM/YYYY or DD-MM-YYYY)
+        self.birthdate_pattern = re.compile(r'\b(?:0[1-9]|[12]\d|3[01])[-/](?:0[1-9]|1[0-2])[-/](?:19|20)\d{2}\b')
+        # Brazilian address pattern (generic)
+        self.address_pattern = re.compile(r'\b(?:Rua|Avenida|Av\.|Travessa|Trav\.|Praça|Pça\.)\s+[A-Za-záéíóúãõç\s]+,?\s*\d+(?:\s*[-,]\s*(?:Apto|Apt\.|Bloco|Blco\.)\s*\d+)?')
+        # Biometric pattern (fingerprint references)
+        self.biometric_pattern = re.compile(r'(?:impressão|impressão digital|biometria|digital|fingerprint)[\s:]*[\w\d]+', re.IGNORECASE)
         
         logger.info("lgpd_agent_initialized", model_path=model_path)
     
@@ -84,8 +91,13 @@ class LGPDAgent:
             {
                 "cpf": [{"value": "123.456.789-00", "start": 10, "end": 24}],
                 "cnpj": [...],
+                "rg": [...],
+                "pis": [...],
                 "email": [...],
                 "phone": [...],
+                "birthdate": [...],
+                "address": [...],
+                "biometric": [...],
                 "person": [...],  # From NER
                 "location": [...]  # From NER
             }
@@ -94,8 +106,12 @@ class LGPDAgent:
             "cpf": [],
             "cnpj": [],
             "rg": [],
+            "pis": [],
             "email": [],
             "phone": [],
+            "birthdate": [],
+            "address": [],
+            "biometric": [],
             "person": [],
             "location": [],
             "organization": []
@@ -126,6 +142,14 @@ class LGPDAgent:
                 "confidence": 1.0
             })
         
+        for match in self.pis_pattern.finditer(text):
+            pii_detected["pis"].append({
+                "value": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "confidence": 1.0
+            })
+        
         for match in self.email_pattern.finditer(text):
             pii_detected["email"].append({
                 "value": match.group(),
@@ -136,6 +160,30 @@ class LGPDAgent:
         
         for match in self.phone_pattern.finditer(text):
             pii_detected["phone"].append({
+                "value": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "confidence": 1.0
+            })
+        
+        for match in self.birthdate_pattern.finditer(text):
+            pii_detected["birthdate"].append({
+                "value": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "confidence": 1.0
+            })
+        
+        for match in self.address_pattern.finditer(text):
+            pii_detected["address"].append({
+                "value": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "confidence": 1.0
+            })
+        
+        for match in self.biometric_pattern.finditer(text):
+            pii_detected["biometric"].append({
                 "value": match.group(),
                 "start": match.start(),
                 "end": match.end(),
@@ -356,12 +404,12 @@ class LGPDAgent:
         kafka_producer = get_kafka_producer()
         if kafka_producer:
             try:
-                await kafka_producer.publish_lgpd_decision(
+                kafka_producer.publish_lgpd_decision(
                     ingestao_id=str(ingestao_id),
-                    pii_types=[k for k, v in pii_detected.items() if v],
-                    masking_actions=masked_data["actions_taken"],
-                    consent_status="valid" if consent_validation["valid"] else "invalid",
-                    compliance_score=compliance_score
+                    pii_detectado=pii_detected,
+                    acoes_tomadas=masked_data["actions_taken"],
+                    consentimento_validado=bool(consent_validation["valid"]),
+                    score_confiabilidade=compliance_score,
                 )
             except Exception as e:
                 logger.error("kafka_logging_failed", error=str(e))

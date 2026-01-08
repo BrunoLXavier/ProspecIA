@@ -6,17 +6,13 @@ export default function HomePage() {
     : 'http://localhost:8000/docs'
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start pt-6 sm:pt-12 lg:pt-24 px-6 sm:px-12 lg:px-24">
-      <div className="z-10 w-full max-w-5xl font-mono text-sm flex items-center justify-center">
-        <h1 className="text-4xl font-bold text-primary-600">ProspecIA</h1>
-      </div>
-
-      <div className="relative flex place-items-center mt-16">
+    <main className="flex min-h-screen flex-col items-center justify-start pt-6 sm:pt-12 lg:pt-24 px-6 sm:px-12 lg:px-24 pb-24">
+      <div className="relative flex place-items-center mt-8">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-secondary-900 mb-4">
             Sistema de Prospecção e Gestão de Inovação
           </h2>
-          <p className="text-secondary-600 mb-8 max-w-2xl">
+          <p className="text-secondary-600 mb-8 max-w-2xl mx-auto text-center">
             Plataforma com IA Responsável para gestão de fomento, portfólio institucional,
             CRM de inovação e pipeline de oportunidades.
           </p>
@@ -58,11 +54,6 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
-      <footer className="mt-16 text-center text-sm text-secondary-500">
-        <p>Wave 0 - Fundação (TRL 3-4)</p>
-        <p className="mt-2">Versão 1.0.0 | Janeiro 2026</p>
-      </footer>
     </main>
   )
 }

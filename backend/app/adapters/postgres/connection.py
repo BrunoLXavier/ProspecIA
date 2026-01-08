@@ -75,14 +75,25 @@ class DatabaseConnection:
         )
         
         # Create async engine with connection pooling
+        # Only pass pool sizing args when using QueuePool (not supported by NullPool)
+        pool_cls = QueuePool if self.settings.ENV == "production" else NullPool
+        engine_kwargs: dict = {
+            "echo": self.settings.DEBUG,
+            "pool_pre_ping": True,
+            "poolclass": pool_cls,
+        }
+        if pool_cls is QueuePool:
+            engine_kwargs.update(
+                {
+                    "pool_size": self.settings.DB_POOL_SIZE,
+                    "max_overflow": self.settings.DB_MAX_OVERFLOW,
+                    "pool_recycle": 3600,
+                }
+            )
+
         self._engine = create_async_engine(
             database_url,
-            echo=self.settings.DEBUG,
-            pool_size=self.settings.DB_POOL_SIZE,
-            max_overflow=self.settings.DB_MAX_OVERFLOW,
-            pool_pre_ping=True,  # Verify connections before using
-            pool_recycle=3600,  # Recycle connections after 1 hour
-            poolclass=QueuePool if self.settings.ENV == "production" else NullPool,
+            **engine_kwargs,
         )
         
         # Create session factory

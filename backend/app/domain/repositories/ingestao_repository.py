@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 import structlog
 
-from app.domain.models.ingestao import Ingestao, StatusIngestao, FonteIngestao
+from app.domain.models.ingestao import Ingestao, IngestionStatus, IngestionSource
 from app.adapters.kafka.producer import get_kafka_producer
+from app.infrastructure.monitoring.metrics import ingestoes_status
 
 logger = structlog.get_logger()
 
@@ -115,8 +116,8 @@ class IngestaoRepository:
     async def list_with_filters(
         self,
         tenant_id: Optional[str] = None,
-        fonte: Optional[FonteIngestao] = None,
-        status: Optional[StatusIngestao] = None,
+        fonte: Optional[IngestionSource] = None,
+        status: Optional[IngestionStatus] = None,
         criado_por: Optional[str] = None,
         data_inicio: Optional[datetime] = None,
         data_fim: Optional[datetime] = None,
@@ -180,7 +181,7 @@ class IngestaoRepository:
     async def update_status(
         self,
         ingestao: Ingestao,
-        new_status: StatusIngestao,
+        new_status: IngestionStatus,
         usuario_id: str,
         motivo: str,
         ip_cliente: Optional[str] = None,
@@ -203,7 +204,7 @@ class IngestaoRepository:
         ingestao.status = new_status
         ingestao.data_atualizacao = datetime.utcnow()
         
-        if new_status == StatusIngestao.CONCLUIDA:
+        if new_status == IngestionStatus.CONCLUIDA:
             ingestao.data_processamento = datetime.utcnow()
         
         # Add history entry
@@ -216,6 +217,13 @@ class IngestaoRepository:
         )
         
         await self.session.flush()
+
+        # Metrics: adjust status counts
+        try:
+            ingestoes_status.labels(status=old_status.value).dec()
+            ingestoes_status.labels(status=new_status.value).inc()
+        except Exception:
+            pass
         
         # Publish audit log
         kafka = get_kafka_producer()
@@ -306,7 +314,7 @@ class IngestaoRepository:
         """
         await self.update_status(
             ingestao=ingestao,
-            new_status=StatusIngestao.CANCELADA,
+            new_status=IngestionStatus.CANCELADA,
             usuario_id=usuario_id,
             motivo=motivo,
             ip_cliente=ip_cliente,

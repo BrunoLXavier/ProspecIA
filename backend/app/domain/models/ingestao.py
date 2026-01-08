@@ -14,7 +14,7 @@ import enum
 from app.adapters.postgres.connection import Base
 
 
-class StatusIngestao(enum.Enum):
+class IngestionStatus(enum.Enum):
     """Status enum for ingestion records."""
     PENDENTE = "pendente"
     PROCESSANDO = "processando"
@@ -23,7 +23,7 @@ class StatusIngestao(enum.Enum):
     CANCELADA = "cancelada"
 
 
-class MetodoIngestao(enum.Enum):
+class IngestionMethod(enum.Enum):
     """Method enum for data ingestion."""
     BATCH_UPLOAD = "batch_upload"
     API_PULL = "api_pull"
@@ -31,7 +31,7 @@ class MetodoIngestao(enum.Enum):
     SCHEDULED = "scheduled"
 
 
-class FonteIngestao(enum.Enum):
+class IngestionSource(enum.Enum):
     """Data source enum for ingestion."""
     RAIS = "rais"
     IBGE = "ibge"
@@ -69,12 +69,12 @@ class Ingestao(Base):
     
     # Source metadata
     fonte = Column(
-        SQLEnum(FonteIngestao),
+        SQLEnum(IngestionSource, native_enum=False, validate_strings=True),
         nullable=False,
         comment="Data source (RAIS, IBGE, INPI, FINEP, BNDES, Customizada)"
     )
     metodo = Column(
-        SQLEnum(MetodoIngestao),
+        SQLEnum(IngestionMethod, native_enum=False, validate_strings=True),
         nullable=False,
         comment="Ingestion method (batch upload, API pull, etc)"
     )
@@ -98,9 +98,9 @@ class Ingestao(Base):
     
     # Status tracking
     status = Column(
-        SQLEnum(StatusIngestao),
+        SQLEnum(IngestionStatus, native_enum=False, validate_strings=True),
         nullable=False,
-        default=StatusIngestao.PENDENTE,
+        default=IngestionStatus.PENDENTE,
         index=True,
         comment="Current ingestion status"
     )

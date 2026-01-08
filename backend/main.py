@@ -19,12 +19,13 @@ import structlog
 from app.infrastructure.config.settings import get_settings
 from app.infrastructure.middleware.logging_middleware import LoggingMiddleware
 from app.infrastructure.middleware.auth_middleware import AuthMiddleware
-from app.interfaces.http.routers import health, system, ingestao
+from app.interfaces.http.routers import health, system, ingestao, consentimento
 
 # Import adapters for initialization
 from app.adapters.postgres import connection as postgres_conn
 from app.adapters.neo4j import connection as neo4j_conn
 from app.adapters.kafka import producer as kafka_prod
+from app.adapters.minio import client as minio_cli
 
 # Configure structured logging
 logger = structlog.get_logger()
@@ -66,6 +67,12 @@ async def lifespan(app: FastAPI):
         kafka_prod.kafka_producer = kafka_prod.KafkaProducerAdapter(settings)
         kafka_prod.kafka_producer.connect()
         logger.info("kafka_initialized")
+
+        # Initialize MinIO client
+        logger.info("initializing_minio")
+        minio_cli.minio_client = minio_cli.MinioClientAdapter(settings)
+        minio_cli.minio_client.connect()
+        logger.info("minio_initialized")
         
         # TODO: Load BERTimbau model for LGPD agent
         # This will be done in use_cases/lgpd_agent.py
@@ -124,7 +131,7 @@ def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
-        description="Sistema de Prospecção e Gestão de Inovação com IA Responsável",
+        description="Intelligent Research Prospecting and Management System with Responsible AI",
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
         openapi_url="/openapi.json" if settings.DEBUG else None,
@@ -152,7 +159,8 @@ def create_application() -> FastAPI:
     # Register routers (Interface Segregation Principle)
     app.include_router(health.router, prefix="/health", tags=["Health"])
     app.include_router(system.router, prefix="/system", tags=["System"])
-    app.include_router(ingestao.router)  # Already has prefix="/ingestoes"
+    app.include_router(ingestao.router)  # Already has prefix="/ingestions"
+    app.include_router(consentimento.router)  # Already has prefix="/consents"
     
     # TODO: Register additional domain routers
     # app.include_router(fomento.router, prefix="/fontes-fomento", tags=["Fomento"])
