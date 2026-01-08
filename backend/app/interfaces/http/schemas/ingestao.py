@@ -28,7 +28,6 @@ class IngestionCreateResponse(BaseModel):
     fonte: str = Field(..., title="Source", description="Data source")
     status: str = Field(..., title="Status", description="Current status")
     arquivo_storage_path: Optional[str] = Field(None, title="Storage Path", description="MinIO storage path")
-    qr_code_base64: Optional[str] = Field(None, title="QR Code Base64", description="QR code for tracking")
     confiabilidade_score: int = Field(..., title="Reliability Score", description="Reliability score 0-100")
     data_ingestao: datetime = Field(..., title="Ingestion Time", description="Ingestion timestamp")
     

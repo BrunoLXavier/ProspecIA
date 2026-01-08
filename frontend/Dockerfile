@@ -14,9 +14,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies with caching
+# Install dependencies with caching (npm install to allow lock regeneration inside container)
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit
+  npm install --prefer-offline --no-audit --legacy-peer-deps
 
 # ============================================
 # Stage 2: Builder

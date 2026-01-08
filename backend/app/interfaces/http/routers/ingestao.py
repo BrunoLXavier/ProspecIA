@@ -9,16 +9,16 @@ Implements:
 - GET /ingestions/{id}/lgpd-report: Get LGPD compliance report
 """
 
-import io
-import base64
 from typing import Optional
 import time
+import json
+import csv
+import io
 from uuid import UUID, uuid4
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-import qrcode
 import structlog
 
 from app.adapters.postgres.connection import get_session
@@ -54,6 +54,136 @@ from app.interfaces.http.schemas.ingestao import (
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/ingestions", tags=["Ingestion"])
+
+
+def extract_sample_data(file_content: bytes, file_extension: str, max_samples: int = 3) -> dict:
+    """
+    Extract sample data from uploaded file for preview.
+    
+    Supports: CSV, JSON, TXT (as raw text)
+    Returns: {"dados_sample": [...], "total_registros": int, "registros_validos": int}
+    """
+    try:
+        if file_extension.lower() == 'csv':
+            # Try multiple encodings
+            text_content = None
+            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    text_content = file_content.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if text_content is None:
+                return {
+                    "dados_sample": [],
+                    "total_registros": 0,
+                    "registros_validos": 0,
+                    "registros_invalidos": 0
+                }
+            
+            reader = csv.DictReader(io.StringIO(text_content))
+            rows = []
+            total = 0
+            for row in reader:
+                if len(rows) < max_samples:
+                    rows.append(row)
+                total += 1
+            return {
+                "dados_sample": rows,
+                "total_registros": total,
+                "registros_validos": total,  # Simplified - assume all valid for now
+                "registros_invalidos": 0
+            }
+        
+        elif file_extension.lower() == 'json':
+            # Try multiple encodings for JSON
+            text_content = None
+            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    text_content = file_content.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if text_content is None:
+                return {
+                    "dados_sample": [],
+                    "total_registros": 0,
+                    "registros_validos": 0,
+                    "registros_invalidos": 0
+                }
+            
+            data = json.loads(text_content)
+            
+            # Handle array of objects
+            if isinstance(data, list):
+                return {
+                    "dados_sample": data[:max_samples],
+                    "total_registros": len(data),
+                    "registros_validos": len(data),
+                    "registros_invalidos": 0
+                }
+            # Handle object with data key
+            elif isinstance(data, dict) and "data" in data:
+                items = data["data"] if isinstance(data["data"], list) else [data["data"]]
+                return {
+                    "dados_sample": items[:max_samples],
+                    "total_registros": len(items),
+                    "registros_validos": len(items),
+                    "registros_invalidos": 0
+                }
+            else:
+                return {
+                    "dados_sample": [data] if not isinstance(data, list) else data[:max_samples],
+                    "total_registros": 1 if not isinstance(data, list) else len(data),
+                    "registros_validos": 1 if not isinstance(data, list) else len(data),
+                    "registros_invalidos": 0
+                }
+        
+        elif file_extension.lower() in ['txt', 'xml']:
+            # For text files, try multiple encodings
+            text_content = None
+            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    text_content = file_content.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if text_content is None:
+                return {
+                    "dados_sample": [],
+                    "total_registros": 0,
+                    "registros_validos": 0,
+                    "registros_invalidos": 0
+                }
+            
+            lines = text_content.split('\n')[:max_samples]
+            return {
+                "dados_sample": [{"conteudo": line} for line in lines if line.strip()],
+                "total_registros": len(lines),
+                "registros_validos": len([l for l in lines if l.strip()]),
+                "registros_invalidos": len([l for l in lines if not l.strip()])
+            }
+        
+        else:
+            # Unsupported format - return empty sample
+            return {
+                "dados_sample": [],
+                "total_registros": 0,
+                "registros_validos": 0,
+                "registros_invalidos": 0
+            }
+    
+    except Exception as e:
+        logger.warning("sample_extraction_failed", error=str(e), file_extension=file_extension)
+        return {
+            "dados_sample": [],
+            "total_registros": 0,
+            "registros_validos": 0,
+            "registros_invalidos": 0
+        }
 
 
 @router.post(
@@ -128,6 +258,9 @@ async def create_ingestao(
             repository=consent_repo
         )
         
+        # Extract sample data from file
+        sample_data = extract_sample_data(file_content, file_extension)
+        
         # Create ingestion entity
         ingestao = Ingestao(
             id=ingestao_id,
@@ -148,13 +281,20 @@ async def create_ingestao(
             data_ingestao=datetime.utcnow(),
             data_criacao=datetime.utcnow(),
             data_atualizacao=datetime.utcnow(),
-            descricao=descricao
+            descricao=descricao,
+            total_registros=sample_data.get("total_registros", 0),
+            registros_validos=sample_data.get("registros_validos", 0),
+            registros_invalidos=sample_data.get("registros_invalidos", 0),
+            metadata_adicional={
+                "dados_sample": sample_data.get("dados_sample", [])
+            }
         )
         
         # Save to database
         ingestao_repo = IngestaoRepository(session)
         ip_cliente = request.client.host if request.client else None
         created_ingestao = await ingestao_repo.create(ingestao, usuario_id=str(user["id"]), ip_cliente=ip_cliente)
+        await session.commit()
         
         # Create lineage node in Neo4j
         neo4j = get_neo4j_connection()
@@ -174,16 +314,6 @@ async def create_ingestao(
                 logger.info("lineage_node_created", ingestao_id=str(ingestao_id))
             except Exception as e:
                 logger.error("lineage_creation_failed", error=str(e))
-        
-        # Generate QR code for tracking
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(f"https://prospecai.senai.br/ingestions/{ingestao_id}")
-        qr.make(fit=True)
-        
-        qr_img = qr.make_image(fill_color="black", back_color="white")
-        buffer = io.BytesIO()
-        qr_img.save(buffer, format="PNG")
-        qr_code_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
         
         # Metrics instrumentation
         try:
@@ -208,14 +338,23 @@ async def create_ingestao(
         except Exception:
             pass
 
+        # Mark ingestion as completed now that processing finished
+        await ingestao_repo.update_status(
+            ingestao=created_ingestao,
+            new_status=IngestionStatus.CONCLUIDA,
+            usuario_id=str(user["id"]),
+            motivo="Processamento concluido",
+            ip_cliente=ip_cliente,
+        )
+        await session.commit()
+
         logger.info("ingestao_created", ingestao_id=str(ingestao_id), fonte=fonte.value, compliance_score=lgpd_result["compliance_score"])
         
-        return IngestaoCreateResponse(
+        return IngestionCreateResponse(
             id=created_ingestao.id,
             fonte=created_ingestao.fonte.value,
             status=created_ingestao.status.value,
             arquivo_storage_path=created_ingestao.arquivo_storage_path,
-            qr_code_base64=qr_code_base64,
             confiabilidade_score=created_ingestao.confiabilidade_score,
             data_ingestao=created_ingestao.data_ingestao
         )

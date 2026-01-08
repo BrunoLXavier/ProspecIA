@@ -19,7 +19,17 @@ import structlog
 from app.infrastructure.config.settings import get_settings
 from app.infrastructure.middleware.logging_middleware import LoggingMiddleware
 from app.infrastructure.middleware.auth_middleware import AuthMiddleware
+from app.infrastructure.middleware.acl_middleware import AclMiddleware
 from app.interfaces.http.routers import health, system, ingestao, consentimento
+from app.interfaces.http.routers import i18n
+from app.interfaces.http.routers import model_config
+from app.interfaces.http.routers import acl
+from app.api.routes import translations
+from app.api.routes.translations_init import initialize_default_translations
+from app.interfaces.routers import funding_sources
+from app.interfaces.routers import clients, interactions
+from app.interfaces.routers import portfolio
+from app.interfaces.routers import opportunities
 
 # Import adapters for initialization
 from app.adapters.postgres import connection as postgres_conn
@@ -73,6 +83,11 @@ async def lifespan(app: FastAPI):
         minio_cli.minio_client = minio_cli.MinioClientAdapter(settings)
         minio_cli.minio_client.connect()
         logger.info("minio_initialized")
+        
+        # Initialize default translations
+        logger.info("initializing_default_translations")
+        initialize_default_translations()
+        logger.info("default_translations_initialized")
         
         # TODO: Load BERTimbau model for LGPD agent
         # This will be done in use_cases/lgpd_agent.py
@@ -155,17 +170,28 @@ def create_application() -> FastAPI:
     
     # Add authentication middleware (with settings)
     app.add_middleware(AuthMiddleware, settings=settings)
+    # Add ACL middleware (coarse-grained enforcement)
+    app.add_middleware(AclMiddleware)
     
     # Register routers (Interface Segregation Principle)
     app.include_router(health.router, prefix="/health", tags=["Health"])
     app.include_router(system.router, prefix="/system", tags=["System"])
+    app.include_router(model_config.router, prefix="/system", tags=["System Config"])
+    app.include_router(acl.router, prefix="/system", tags=["ACL"])
+    app.include_router(translations.router, prefix="/system", tags=["Translations"])
     app.include_router(ingestao.router)  # Already has prefix="/ingestions"
     app.include_router(consentimento.router)  # Already has prefix="/consents"
+    app.include_router(i18n.router, prefix="/i18n", tags=["i18n"])
     
-    # TODO: Register additional domain routers
-    # app.include_router(fomento.router, prefix="/fontes-fomento", tags=["Fomento"])
-    # app.include_router(clientes.router, prefix="/clientes", tags=["CRM"])
-    # app.include_router(oportunidades.router, prefix="/oportunidades", tags=["Pipeline"])
+    # Wave 2 routers
+    app.include_router(funding_sources.router)  # Already has prefix="/funding-sources"
+    app.include_router(clients.router)  # Already has prefix="/clients"
+    app.include_router(interactions.router)  # Already has prefix="/interactions"
+    app.include_router(portfolio.router)  # Already has prefix="/portfolio"
+    app.include_router(opportunities.router)  # Already has prefix="/opportunities"
+    
+    # TODO: Register additional domain routers (future waves)
+    # app.include_router(relatorios.router, prefix="/reports", tags=["Reports"])
     
     logger.info(
         "application_created",

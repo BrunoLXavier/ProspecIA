@@ -1,13 +1,15 @@
+# Version Control
+.git
+.gitignore
+.gitattributes
+
 # Editors
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+.vscode
 .idea
 *.swp
 *.swo
 *~
+*.sublime-*
 
 # Python
 __pycache__/
@@ -15,37 +17,62 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.pyc
+.pyo
+.pyd
+
+# Virtual Environments
 venv/
 ENV/
 env/
 .venv
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Node
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+tests/
+
+# Build & Distribution
 node_modules/
 .next/
 out/
 build/
 dist/
+*.egg-info/
+.eggs/
 
 # Environment
 .env
 .env.local
 .env.*.local
+.env.example
 
 # Docker
 docker-compose.override.yml
+Dockerfile.dev
 
 # OS
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
+thumbs.db
 
 # Logs
 *.log
 logs/
+*.log.*
 
 # Database
 *.db
 *.sqlite
+*.sqlite3
 pgdata/
 
 # Secrets
@@ -53,3 +80,19 @@ secrets/
 *.key
 *.pem
 credentials.json
+
+# Type Checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDE
+.ruff_cache/
+
+# Miscellaneous
+README.md
+LICENSE
+*.md
+sample_*.csv
+test_*.csv
+seed_data.json

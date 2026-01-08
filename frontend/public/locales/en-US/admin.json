@@ -1,0 +1,67 @@
+{
+  "title": "Translation Management",
+  "description": "Manage translation strings for all supported languages",
+  "subtitle": "Centralized Translation Manager",
+  
+  "table.key": "Translation Key",
+  "table.namespace": "Namespace",
+  "table.pt_br": "Português (pt-BR)",
+  "table.en_us": "English (en-US)",
+  "table.es_es": "Español (es-ES)",
+  "table.actions": "Actions",
+  "table.no_data": "No translations found",
+  "table.search_placeholder": "Search by key or content...",
+  
+  "namespace.common": "Common",
+  "namespace.ingestion": "Ingestion",
+  "namespace.wave2": "Wave 2",
+  
+  "button.add_key": "Add Key",
+  "button.edit": "Edit",
+  "button.delete": "Delete",
+  "button.save": "Save",
+  "button.cancel": "Cancel",
+  "button.export": "Export JSON",
+  "button.import": "Import JSON",
+  
+  "form.key_label": "Translation Key",
+  "form.key_placeholder": "Ex: button.save, home.title",
+  "form.namespace_label": "Namespace",
+  "form.pt_br_label": "Português (Brasil)",
+  "form.en_us_label": "English (USA)",
+  "form.es_es_label": "Español (España)",
+  "form.required": "Required field",
+  "form.invalid_key": "Key must follow format: namespace.name (letters, numbers and underscore only)",
+  
+  "modal.add_title": "Add New Translation Key",
+  "modal.edit_title": "Edit Translation Key",
+  "modal.confirm_delete": "Are you sure you want to delete this key?",
+  "modal.delete_warning": "This will remove the translation in all languages.",
+  
+  "filter.namespace": "Filter by Namespace",
+  "filter.language": "Filter by Language",
+  "filter.all_namespaces": "All Namespaces",
+  "filter.all_languages": "All Languages",
+  
+  "message.success_create": "Translation key created successfully",
+  "message.success_update": "Translation key updated successfully",
+  "message.success_delete": "Translation key deleted successfully",
+  "message.error": "Error processing translation",
+  "message.loading": "Loading translations...",
+  
+  "validation.missing_pt_br": "Portuguese translation is required",
+  "validation.missing_en_us": "English translation is required",
+  "validation.missing_es_es": "Spanish translation is required",
+  "validation.key_exists": "This translation key already exists",
+  
+  "export.title": "Export Translations",
+  "export.success": "Translations exported successfully",
+  "import.title": "Import Translations",
+  "import.success": "Translations imported successfully",
+  "import.error": "Error importing translations. Please check file format",
+  
+  "history.updated": "Last updated",
+  "history.updated_by": "Updated by",
+  "history.created": "Created at",
+  "history.version": "Version"
+}

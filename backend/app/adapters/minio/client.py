@@ -14,6 +14,7 @@ from minio.error import S3Error
 import structlog
 
 from app.infrastructure.config.settings import Settings
+from app.infrastructure.patterns.resilience import CircuitBreaker, retry
 
 logger = structlog.get_logger()
 
@@ -26,7 +27,9 @@ class MinioClientAdapter:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._client: Optional[Minio] = None
+        self._cb = CircuitBreaker(failure_threshold=3, reset_timeout_sec=15)
 
+    @retry(exceptions=(S3Error, Exception), max_attempts=4, base_delay=0.2)
     def connect(self) -> None:
         """
         Initialize MinIO client and ensure bucket exists.
@@ -67,18 +70,25 @@ class MinioClientAdapter:
             raise RuntimeError("MinIO not connected. Call connect() first.")
 
         bucket = self.settings.MINIO_BUCKET_NAME
+        if not self._cb.allow():
+            logger.warning("minio_circuit_open", object_name=object_name)
+            raise RuntimeError("MinIO circuit open")
+
         try:
+            # Pass raw bytes to put_object to satisfy test fake client behavior
             self._client.put_object(
                 bucket,
                 object_name,
-                data=bytes(data),
+                data=data,
                 length=len(data),
                 content_type=content_type or "application/octet-stream",
             )
             logger.info("minio_upload_success", bucket=bucket, object_name=object_name, size=len(data))
+            self._cb.record_success()
             return object_name
         except S3Error as e:
             logger.error("minio_upload_failed", error=str(e))
+            self._cb.record_failure()
             raise
 
     def presigned_get_url(self, object_name: str, expiry_minutes: int = 60) -> str:

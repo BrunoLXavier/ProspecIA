@@ -10,5 +10,6 @@ providers:
     updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
-      path: /etc/grafana/provisioning/dashboards
+      # Dashboards are mounted into /var/lib/grafana/dashboards by docker-compose
+      path: /var/lib/grafana/dashboards
       foldersFromFilesStructure: true

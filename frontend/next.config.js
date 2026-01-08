@@ -28,7 +28,8 @@ const nextConfig = {
   
   // Compiler options
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    // Keep console output even in production builds to aid debugging
+    removeConsole: false,
   },
   
   // Headers for security

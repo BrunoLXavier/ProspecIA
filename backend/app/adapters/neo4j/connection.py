@@ -11,6 +11,7 @@ from neo4j.exceptions import ServiceUnavailable, AuthError
 import structlog
 
 from app.infrastructure.config.settings import Settings
+from app.infrastructure.patterns.resilience import CircuitBreaker, async_retry
 
 logger = structlog.get_logger()
 
@@ -41,7 +42,9 @@ class Neo4jConnection:
         """
         self.settings = settings
         self._driver: Optional[AsyncDriver] = None
+        self._cb = CircuitBreaker(failure_threshold=3, reset_timeout_sec=20)
         
+    @async_retry(exceptions=(AuthError, ServiceUnavailable, Exception), max_attempts=4, base_delay=0.3)
     async def connect(self) -> None:
         """
         Initialize Neo4j driver with connection pooling.
@@ -73,15 +76,19 @@ class Neo4jConnection:
             await self._driver.verify_connectivity()
             
             logger.info("neo4j_connected")
+            self._cb.record_success()
             
         except AuthError as e:
             logger.error("neo4j_auth_failed", error=str(e))
+            self._cb.record_failure()
             raise
         except ServiceUnavailable as e:
             logger.error("neo4j_service_unavailable", error=str(e))
+            self._cb.record_failure()
             raise
         except Exception as e:
             logger.error("neo4j_connection_failed", error=str(e), error_type=type(e).__name__)
+            self._cb.record_failure()
             raise
     
     async def disconnect(self) -> None:
@@ -259,14 +266,14 @@ class Neo4jConnection:
         Returns:
             List of nodes and relationships in the lineage path
         """
-        query = """
-        MATCH path = (n {id: $node_id})-[*1..{max_depth}]->(ancestor)
+        query = f"""
+        MATCH path = (n {{id: $node_id}})-[*1..{max_depth}]->(ancestor)
         RETURN path
         """
         
         result = await self.execute_query(
             query,
-            {"node_id": node_id, "max_depth": max_depth}
+            {"node_id": node_id}
         )
         
         return result

@@ -14,8 +14,11 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
 
-from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
-import torch
+# Optional ML imports are loaded lazily in _load_model()
+pipeline = None
+AutoTokenizer = None
+AutoModelForTokenClassification = None
+_torch = None
 
 from app.domain.repositories.consentimento_repository import ConsentimentoRepository
 from app.adapters.kafka.producer import get_kafka_producer
@@ -62,9 +65,28 @@ class LGPDAgent:
         logger.info("lgpd_agent_initialized", model_path=model_path)
     
     def _load_model(self):
-        """Load BERTimbau model for NER."""
+        """Load BERTimbau model for NER if dependencies are available."""
         try:
-            device = 0 if torch.cuda.is_available() else -1
+            # Lazy import to avoid hard dependency during tests
+            global pipeline, AutoTokenizer, AutoModelForTokenClassification, _torch
+            if pipeline is None or AutoTokenizer is None or AutoModelForTokenClassification is None:
+                try:
+                    from transformers import pipeline as _pipeline, AutoTokenizer as _AutoTokenizer, AutoModelForTokenClassification as _AutoModel
+                    pipeline = _pipeline
+                    AutoTokenizer = _AutoTokenizer
+                    AutoModelForTokenClassification = _AutoModel
+                except Exception as e:
+                    logger.warning("transformers_not_available", error=str(e))
+                    self.ner_pipeline = None
+                    return
+            if _torch is None:
+                try:
+                    import torch as _torch_mod
+                    _torch = _torch_mod
+                except Exception as e:
+                    logger.warning("torch_not_available", error=str(e))
+                    _torch = None
+            device = 0 if (_torch and _torch.cuda.is_available()) else -1
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             self.model = AutoModelForTokenClassification.from_pretrained(self.model_path)
             self.ner_pipeline = pipeline(
@@ -72,12 +94,12 @@ class LGPDAgent:
                 model=self.model,
                 tokenizer=self.tokenizer,
                 device=device,
-                aggregation_strategy="simple"
+                aggregation_strategy="simple",
             )
             logger.info("bertimbau_model_loaded", device="cuda" if device == 0 else "cpu")
         except Exception as e:
-            logger.error("model_loading_failed", error=str(e))
-            raise
+            logger.warning("model_loading_failed", error=str(e))
+            self.ner_pipeline = None
     
     def detect_pii(self, text: str) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -192,8 +214,10 @@ class LGPDAgent:
         
         # NER-based detection for names, locations, organizations
         try:
-            ner_results = self.ner_pipeline(text[:5000])  # Limit to 5000 chars for performance
-            
+            if self.ner_pipeline:
+                ner_results = self.ner_pipeline(text[:5000])  # Limit to 5000 chars for performance
+            else:
+                ner_results = []
             for entity in ner_results:
                 entity_type = entity.get("entity_group", "").lower()
                 

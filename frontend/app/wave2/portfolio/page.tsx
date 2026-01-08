@@ -1,0 +1,10 @@
+/**
+ * Portfolio page
+ */
+
+import { redirect } from 'next/navigation';
+
+export default function PortfolioPage() {
+  redirect('/portfolio');
+  return null;
+}

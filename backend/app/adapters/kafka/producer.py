@@ -6,13 +6,25 @@ Implements async message publishing with error handling.
 """
 
 from typing import Dict, Any, Optional
-from kafka import KafkaProducer
-from kafka.errors import KafkaError, KafkaTimeoutError
 import json
 import structlog
 from datetime import datetime
 
+# Optional Kafka imports for test environments without kafka-python
+try:
+    from kafka import KafkaProducer  # type: ignore
+    from kafka.errors import KafkaError, KafkaTimeoutError  # type: ignore
+except Exception:  # pragma: no cover - fallback when kafka not available
+    KafkaProducer = None  # type: ignore
+
+    class KafkaError(Exception):
+        pass
+
+    class KafkaTimeoutError(Exception):
+        pass
+
 from app.infrastructure.config.settings import Settings
+from app.infrastructure.patterns.resilience import CircuitBreaker, retry
 
 logger = structlog.get_logger()
 
@@ -42,7 +54,9 @@ class KafkaProducerAdapter:
         """
         self.settings = settings
         self._producer: Optional[KafkaProducer] = None
+        self._cb = CircuitBreaker(failure_threshold=4, reset_timeout_sec=20)
         
+    @retry(exceptions=(KafkaError,), max_attempts=4, base_delay=0.3)
     def connect(self) -> None:
         """
         Initialize Kafka producer with JSON serialization.
@@ -53,6 +67,9 @@ class KafkaProducerAdapter:
         if self._producer is not None:
             logger.warning("kafka_already_connected")
             return
+        if KafkaProducer is None:
+            logger.warning("kafka_library_missing")
+            raise KafkaError("kafka-python library not available")
         
         logger.info(
             "kafka_connecting",
@@ -253,6 +270,11 @@ class KafkaProducerAdapter:
             logger.error("kafka_publish_failed_not_connected", topic=topic)
             return False
         
+        # Circuit breaker guard
+        if not self._cb.allow():
+            logger.warning("kafka_circuit_open", topic=topic)
+            return False
+
         try:
             future = self._producer.send(topic, key=key, value=value)
             
@@ -266,6 +288,7 @@ class KafkaProducerAdapter:
                 offset=record_metadata.offset,
             )
             
+            self._cb.record_success()
             return True
             
         except KafkaTimeoutError as e:
@@ -274,6 +297,7 @@ class KafkaProducerAdapter:
                 topic=topic,
                 error=str(e),
             )
+            self._cb.record_failure()
             return False
             
         except KafkaError as e:
@@ -282,6 +306,7 @@ class KafkaProducerAdapter:
                 topic=topic,
                 error=str(e),
             )
+            self._cb.record_failure()
             return False
             
         except Exception as e:
@@ -291,6 +316,7 @@ class KafkaProducerAdapter:
                 error=str(e),
                 error_type=type(e).__name__,
             )
+            self._cb.record_failure()
             return False
     
     @property

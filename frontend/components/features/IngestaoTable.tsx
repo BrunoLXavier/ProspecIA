@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { get } from '@/lib/api/client'
+import { useI18n } from '@/lib/hooks/useI18n'
 import LGPDReport from './LGPDReport'
 import DataViewer from './DataViewer'
 import PIIViewer from './PIIViewer'
@@ -26,6 +27,7 @@ type IngestaoListResponse = {
 type ViewMode = 'lgpd' | 'data' | 'pii' | 'consent'
 
 export default function IngestaoTable() {
+  const { t, locale } = useI18n()
   const [data, setData] = useState<IngestaoListItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('lgpd')
@@ -33,14 +35,35 @@ export default function IngestaoTable() {
 
   const load = async () => {
     try {
-      const res = await get<IngestaoListResponse>('/ingestions')
+      // Add timestamp to force cache bust
+      const timestamp = Date.now()
+      const res = await get<IngestaoListResponse>(`/ingestions?_t=${timestamp}`)
+      console.log('Loaded ingestions:', res.items.length, 'items')
       setData(res.items)
     } catch (e) {
-      console.error(e)
+      console.error('Failed to load ingestions:', e)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { 
+    // Initial load
+    load() 
+    
+    // Listen for ingestion creation events for immediate update
+    const handler = () => { 
+      load()
+      setTimeout(() => load(), 1000)
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ingestion:created', handler)
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('ingestion:created', handler)
+      }
+    }
+  }, [])
 
   const handleAction = (id: string, mode: ViewMode) => {
     if (mode === 'consent') {
@@ -54,28 +77,34 @@ export default function IngestaoTable() {
     setViewMode(mode)
     setActionMenuId(null)
   }
+  
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const localeCode = locale === 'pt-BR' ? 'pt-BR' : locale === 'es-ES' ? 'es-ES' : 'en-US'
+    return date.toLocaleString(localeCode)
+  }
 
   return (
     <>
       <div className="mt-6">
-        <h2 className="text-xl font-semibold mb-2">Ingestões Recentes</h2>
+        <h2 className="text-xl font-semibold mb-2">{t('ingestion:table.recent_ingestions')}</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full border rounded">
             <thead>
               <tr className="bg-gray-50">
-                <th className="p-2 text-left">ID</th>
-                <th className="p-2 text-left">Fonte</th>
-                <th className="p-2 text-left">Status</th>
-                <th className="p-2 text-left">Score</th>
-                <th className="p-2 text-left">Data</th>
-                <th className="p-2 text-left">Ações</th>
+                <th className="p-2 text-left">{t('ingestion:table.id')}</th>
+                <th className="p-2 text-left">{t('ingestion:table.source')}</th>
+                <th className="p-2 text-left">{t('ingestion:table.status')}</th>
+                <th className="p-2 text-left">{t('ingestion:table.lgpd_score')}</th>
+                <th className="p-2 text-left">{t('ingestion:table.created_at')}</th>
+                <th className="p-2 text-left">{t('ingestion:table.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {data.map((it) => (
                 <tr key={it.id} className="border-t hover:bg-gray-50">
                   <td className="p-2 text-xs font-mono">{it.id.slice(0, 8)}...</td>
-                  <td className="p-2 font-medium">{it.fonte.toUpperCase()}</td>
+                  <td className="p-2 font-medium">{t(`ingestion:source.${it.fonte}`)}</td>
                   <td className="p-2">
                     <span className={`px-2 py-1 rounded text-xs ${
                       it.status === 'concluida' ? 'bg-green-100 text-green-800' :
@@ -83,21 +112,21 @@ export default function IngestaoTable() {
                       it.status === 'erro' ? 'bg-red-100 text-red-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {it.status}
+                      {t(`ingestion:status.${it.status}`)}
                     </span>
                   </td>
                   <td className="p-2">
                     <span className="font-semibold">{it.confiabilidade_score}%</span>
                   </td>
                   <td className="p-2 text-sm text-gray-600">
-                    {new Date(it.data_ingestao).toLocaleString('pt-BR')}
+                    {formatDate(it.data_ingestao)}
                   </td>
                   <td className="p-2">
                     <button
                       onClick={() => setActionMenuId(actionMenuId === it.id ? null : it.id)}
                       className="px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 text-sm font-medium"
                     >
-                      Ações ▾
+                      {t('ingestion:action.actions_button')} ▾
                     </button>
                   </td>
                 </tr>
@@ -106,7 +135,7 @@ export default function IngestaoTable() {
           </table>
         </div>
         {data.length === 0 && (
-          <p className="text-center text-gray-500 py-8">Nenhuma ingestão encontrada</p>
+          <p className="text-center text-gray-500 py-8">{t('ingestion:table.no_data')}</p>
         )}
       </div>
 
@@ -115,7 +144,7 @@ export default function IngestaoTable() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-4">
           <div className="bg-white w-full sm:w-96 rounded-t-lg sm:rounded-lg p-4 sm:p-6 max-h-96 overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Ações da Ingestão</h3>
+              <h3 className="text-lg font-semibold">{t('ingestion:table.actions_menu')}</h3>
               <button
                 onClick={() => setActionMenuId(null)}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -131,8 +160,8 @@ export default function IngestaoTable() {
               >
                 <span className="text-xl">📊</span>
                 <div>
-                  <div className="font-medium">Ver Dados</div>
-                  <div className="text-xs text-gray-500">Amostra dos dados ingeridos</div>
+                  <div className="font-medium">{t('ingestion:action.view_data')}</div>
+                  <div className="text-xs text-gray-500">{t('ingestion:action.view_data_desc')}</div>
                 </div>
               </button>
 
@@ -142,8 +171,8 @@ export default function IngestaoTable() {
               >
                 <span className="text-xl">🔒</span>
                 <div>
-                  <div className="font-medium">Ver Dados PII</div>
-                  <div className="text-xs text-gray-500">Dados sensíveis detectados</div>
+                  <div className="font-medium">{t('ingestion:action.view_pii')}</div>
+                  <div className="text-xs text-gray-500">{t('ingestion:action.view_pii_desc')}</div>
                 </div>
               </button>
 
@@ -153,8 +182,8 @@ export default function IngestaoTable() {
               >
                 <span className="text-xl">📋</span>
                 <div>
-                  <div className="font-medium">Ver Relatório LGPD</div>
-                  <div className="text-xs text-gray-500">Análise de conformidade</div>
+                  <div className="font-medium">{t('ingestion:action.lgpd_report')}</div>
+                  <div className="text-xs text-gray-500">{t('ingestion:action.lgpd_report_desc')}</div>
                 </div>
               </button>
 
@@ -167,8 +196,8 @@ export default function IngestaoTable() {
                   >
                     <span className="text-xl">✓</span>
                     <div>
-                      <div className="font-medium">Ver Consentimento</div>
-                      <div className="text-xs text-gray-500">Detalhes do consentimento</div>
+                      <div className="font-medium">{t('ingestion:action.view_consent')}</div>
+                      <div className="text-xs text-gray-500">{t('ingestion:action.view_consent_desc')}</div>
                     </div>
                   </button>
                 )

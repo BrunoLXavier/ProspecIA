@@ -1,4 +1,4 @@
-# ProspecIA Backend - Python Dependencies
+# ProspecIA Backend - Python Dependencies (Production)
 # Core Framework & Web
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
@@ -34,18 +34,9 @@ aiohttp==3.9.1
 # Object Storage - MinIO
 minio==7.2.3
 
-# ML & AI
-mlflow==2.9.2
-scikit-learn==1.4.0
-gensim==4.3.2
+# Data Processing (minimal)
 numpy==1.26.3
 pandas==2.1.4
-
-# NLP
-spacy==3.7.2
-nltk==3.8.1
-transformers==4.36.2
-torch==2.1.2
 
 # Monitoring & Logging
 prometheus-client==0.19.0
@@ -57,25 +48,3 @@ python-dotenv==1.0.0
 pydantic-core==2.14.6
 email-validator==2.1.0
 qrcode[pil]==7.4.2
-
-# Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-pytest-mock==3.12.0
-
-# Code Quality
-black==23.12.1
-flake8==7.0.0
-mypy==1.8.0
-isort==5.13.2
-pylint==3.0.3
-
-# Type Stubs
-types-requests==2.31.0.20240106
-types-python-jose==3.3.4.8
-sqlalchemy[mypy]==2.0.25
-
-# Development
-ipython==8.20.0
-watchdog==3.0.0

@@ -96,6 +96,14 @@ INGESTOES_EXEMPLO = [
         "lgpd_validado": True,
         "compliance_score": 95,
         "descricao": "Dados RAIS Q4 2025 - São Paulo (10.000 registros)",
+        "total_registros": 10000,
+        "registros_validos": 9800,
+        "registros_invalidos": 200,
+        "dados_sample": [
+            {"cpf": "***.***.789-**", "nome": "João S***", "cargo": "Analista", "salario": 5500.00, "empresa": "Tech Solutions SP"},
+            {"cpf": "***.***.321-**", "nome": "Maria P***", "cargo": "Desenvolvedora", "salario": 7800.00, "empresa": "Inovação Digital"},
+            {"cpf": "***.***.654-**", "nome": "Carlos M***", "cargo": "Gerente", "salario": 12000.00, "empresa": "Consultoria Tech"},
+        ],
     },
     {
         "fonte": IngestionSource.IBGE,
@@ -109,6 +117,14 @@ INGESTOES_EXEMPLO = [
         "lgpd_validado": True,
         "compliance_score": 100,
         "descricao": "Censo Empresarial IBGE - SP 2025 (5.000 empresas)",
+        "total_registros": 5000,
+        "registros_validos": 4998,
+        "registros_invalidos": 2,
+        "dados_sample": [
+            {"cnpj": "12.345.678/0001-90", "razao_social": "Indústria ABC Ltda", "setor": "Manufatura", "porte": "Médio", "faturamento_anual": 15000000},
+            {"cnpj": "98.765.432/0001-10", "razao_social": "Comércio XYZ SA", "setor": "Varejo", "porte": "Grande", "faturamento_anual": 45000000},
+            {"cnpj": "55.444.333/0001-22", "razao_social": "Serviços Tech ME", "setor": "Tecnologia", "porte": "Pequeno", "faturamento_anual": 800000},
+        ],
     },
     {
         "fonte": IngestionSource.INPI,
@@ -123,6 +139,13 @@ INGESTOES_EXEMPLO = [
         "lgpd_validado": False,
         "compliance_score": 75,
         "descricao": "Patentes na área de Saúde - INPI 2025 (1.200 registros) - Aguardando validação LGPD",
+        "total_registros": 1200,
+        "registros_validos": 0,
+        "registros_invalidos": 0,
+        "dados_sample": [
+            {"numero_patente": "BR1020250001234", "titulo": "Dispositivo de diagnóstico por imagem", "inventor": "Dr. João S***", "area": "Equipamentos Médicos", "ano_deposito": 2024},
+            {"numero_patente": "BR1020250005678", "titulo": "Método de análise genética", "inventor": "Dra. Maria S***", "area": "Biotecnologia", "ano_deposito": 2024},
+        ],
     },
     {
         "fonte": IngestionSource.FINEP,
@@ -137,6 +160,14 @@ INGESTOES_EXEMPLO = [
         "lgpd_validado": True,
         "compliance_score": 90,
         "descricao": "Projetos FINEP aprovados em 2024 - Área IA/ML (300 projetos)",
+        "total_registros": 300,
+        "registros_validos": 298,
+        "registros_invalidos": 2,
+        "dados_sample": [
+            {"cnpj": "45.678.901/0001-23", "projeto": "IA para diagnóstico médico", "area": "Saúde Digital", "valor_aprovado": 850000, "prazo_meses": 24},
+            {"cnpj": "11.222.333/0001-44", "projeto": "Machine Learning para agronegócio", "area": "AgTech", "valor_aprovado": 650000, "prazo_meses": 18},
+            {"cnpj": "99.888.777/0001-55", "projeto": "Blockchain para supply chain", "area": "Logística", "valor_aprovado": 1200000, "prazo_meses": 30},
+        ],
     },
     {
         "fonte": IngestionSource.BNDES,
@@ -159,6 +190,53 @@ INGESTOES_EXEMPLO = [
             },
         ],
         "descricao": "Linhas de fomento BNDES - Energia 2025 (ERRO: formato inválido)",
+        "total_registros": 0,
+        "registros_validos": 0,
+        "registros_invalidos": 0,
+        "dados_sample": [],  # Vazio porque ingestão falhou
+    },
+    {
+        "fonte": IngestionSource.CUSTOMIZADA,
+        "metodo": IngestionMethod.BATCH_UPLOAD,
+        "confiabilidade_score": 80,
+        "status": IngestionStatus.CONCLUIDA,
+        "arquivo_path": "ingestoes/2026/01/clientes_importados_2025.csv",
+        "pii_detectado": {
+            "cpf": ["111.222.333-44", "555.666.777-88"],
+            "email": ["cliente1@email.com", "cliente2@email.com"],
+        },
+        "lgpd_validado": True,
+        "compliance_score": 85,
+        "descricao": "Dados de clientes importados via upload - Cadastro 2025 (2.500 registros)",
+        "total_registros": 2500,
+        "registros_validos": 2450,
+        "registros_invalidos": 50,
+        "dados_sample": [
+            {"cpf": "111.222.333-**", "nome": "Cliente A***", "email": "cliente1@***", "cidade": "São Paulo", "estado": "SP", "segmento": "Varejo"},
+            {"cpf": "555.666.777-**", "nome": "Cliente B***", "email": "cliente2@***", "cidade": "Rio de Janeiro", "estado": "RJ", "segmento": "Serviços"},
+            {"cpf": "999.888.777-**", "nome": "Cliente C***", "email": "cliente3@***", "cidade": "Belo Horizonte", "estado": "MG", "segmento": "Indústria"},
+        ],
+    },
+    {
+        "fonte": IngestionSource.CUSTOMIZADA,
+        "metodo": IngestionMethod.BATCH_UPLOAD,
+        "confiabilidade_score": 75,
+        "status": IngestionStatus.PROCESSANDO,
+        "arquivo_path": "ingestoes/2026/01/transacoes_janeiro_2026.xlsx",
+        "pii_detectado": {
+            "email": ["usuario1@empresa.com", "usuario2@empresa.com"],
+        },
+        "lgpd_validado": False,
+        "compliance_score": 70,
+        "descricao": "Dados de transações de janeiro/2026 - Em processamento (8.900 registros)",
+        "total_registros": 8900,
+        "registros_validos": 0,
+        "registros_invalidos": 0,
+        "dados_sample": [
+            {"data": "2026-01-01", "tipo": "venda", "valor": 1500.00, "categoria": "Eletrônicos", "status": "confirmado"},
+            {"data": "2026-01-02", "tipo": "venda", "valor": 2300.50, "categoria": "Vestuário", "status": "confirmado"},
+            {"data": "2026-01-03", "tipo": "devolução", "valor": 450.00, "categoria": "Eletrônicos", "status": "processando"},
+        ],
     },
 ]
 
@@ -273,12 +351,18 @@ async def seed_ingestoes(session: AsyncSession, consentimentos: list[Consentimen
             arquivo_storage_path=arquivo_storage_path,
             arquivo_size_bytes=0,
             arquivo_mime_type=mime,
+            total_registros=dados.get("total_registros", 0),
+            registros_validos=dados.get("registros_validos", 0),
+            registros_invalidos=dados.get("registros_invalidos", 0),
             pii_detectado=dados.get("pii_detectado", {}),
             acoes_lgpd=["CPF tokenizado", "Email parcialmente mascarado"] if dados.get("pii_detectado") else [],
             consentimento_id=consentimentos[idx % len(consentimentos)].id if dados.get("lgpd_validado") else None,
             erros_encontrados=dados.get("erros_encontrados", []),
             historico_atualizacoes=historico,
             descricao=dados.get("descricao"),
+            metadata_adicional={
+                "dados_sample": dados.get("dados_sample", [])
+            },
         )
         session.add(ingestao)
         ingestoes.append(ingestao)

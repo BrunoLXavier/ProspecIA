@@ -12,6 +12,9 @@ from app.domain.models.ingestao import Ingestao, IngestionSource, IngestionMetho
 class FakeSession:
     async def flush(self):
         return None
+    
+    async def commit(self):
+        return None
 
 
 class FakeIngestaoRepository:
@@ -28,6 +31,10 @@ class FakeIngestaoRepository:
     async def list_with_filters(self, tenant_id: Optional[str] = None, offset: int = 0, limit: int = 50, **filters):
         items = list(self.__class__.store.values())
         return items, len(items)
+    async def update_status(self, ingestao: Ingestao, new_status: str, usuario_id: str, motivo: str = None, ip_cliente: Optional[str] = None):
+        if ingestao:
+            ingestao.status = new_status
+        return ingestao
 
 
 class FakeConsentimentoRepository:
@@ -88,6 +95,9 @@ def fake_get_session():
 
 @pytest.fixture
 def app(monkeypatch):
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from fastapi import Request
+    
     monkeypatch.setattr(ingestao_router, "IngestaoRepository", FakeIngestaoRepository)
     monkeypatch.setattr(ingestao_router, "ConsentimentoRepository", FakeConsentimentoRepository)
     monkeypatch.setattr(ingestao_router, "get_lgpd_agent", fake_get_lgpd_agent)
@@ -95,8 +105,14 @@ def app(monkeypatch):
     monkeypatch.setattr(ingestao_router, "get_neo4j_connection", fake_neo4j_conn)
     monkeypatch.setattr(ingestao_router, "require_roles", fake_require_roles)
 
+    # Middleware to inject mock user into request state
+    class MockAuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            request.state.user = fake_current_user()
+            return await call_next(request)
+
     fastapi_app = FastAPI()
-    fastapi_app.dependency_overrides[ingestao_router.get_current_user] = fake_current_user
+    fastapi_app.add_middleware(MockAuthMiddleware)
     fastapi_app.dependency_overrides[ingestao_router.get_session] = lambda: fake_get_session()
     fastapi_app.include_router(ingestao_router.router)
     return fastapi_app
@@ -110,7 +126,7 @@ def test_post_ingestao_and_list(app):
     resp = client.post("/ingestions", files=files, params=params)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == IngestionStatus.PROCESSANDO.value
+    assert data["status"] == IngestionStatus.CONCLUIDA.value
     ingestao_id = data["id"]
 
     list_resp = client.get("/ingestions")

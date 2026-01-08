@@ -1,0 +1,8 @@
+# Project Overview
+- Purpose: ProspecAI is a smart prospecting and innovation management platform for P&D projects; covers data ingestion/governance, funding sources, institutional portfolio, CRM for clients/interactions, opportunity pipeline, matching, auditing/LGPD, transparency, human-in-the-loop, and observability.
+- Architecture: Clean Architecture/SOLID with strict domain/use_cases/interfaces/adapters/infrastructure separation (backend FastAPI), plus Next.js frontend. i18n, ACL, dynamic model field configs, and status-driven CRUDs are foundational; no hard deletions except admin-only.
+- Stack: Python 3.11 + FastAPI, PostgreSQL, Neo4j, Kafka, MinIO, Keycloak (JWT/roles), Prometheus/Grafana/Loki, MLflow; Docker Compose orchestration. Frontend Next.js 14 (React 18, TS), Tailwind, React Query, React Hook Form, i18next/next-i18next, NextAuth, Vitest/RTL.
+- Backend structure: backend/app/{domain,use_cases,interfaces,adapters,infrastructure,api}; Alembic migrations; scripts and tests folders; config via env/.env.example; logging with structlog; metrics at /system/metrics; health at /health/ready.
+- Frontend structure: frontend/app with admin, clients, dashboard, funding-sources, pipeline, portfolio, wave2; shared components, lib utilities, types; i18n assets in public/locales; global providers in app/providers.tsx.
+- Key principles (from implementation_plan): code in EN-US; zero hardcoded strings (use i18n keys); dynamic configs for models/fields; ACL checks before actions; human validation for AI outputs; transparency of AI hypotheses/scores; accessibility and locale-based formatting.
+- Status: Wave 0 (infra, ACL, i18n, observability) and Wave 1 (ingestion + LGPD) marked complete with seeds, dashboards, and ~51% backend coverage per docs.

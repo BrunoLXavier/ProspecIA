@@ -1,0 +1,67 @@
+{
+  "title": "Administração de Traduções",
+  "description": "Gerencie as strings de tradução para todos os idiomas suportados",
+  "subtitle": "Gerenciador Centralizado de Traduções",
+  
+  "table.key": "Chave de Tradução",
+  "table.namespace": "Namespace",
+  "table.pt_br": "Português (pt-BR)",
+  "table.en_us": "English (en-US)",
+  "table.es_es": "Español (es-ES)",
+  "table.actions": "Ações",
+  "table.no_data": "Nenhuma tradução encontrada",
+  "table.search_placeholder": "Pesquise por chave ou conteúdo...",
+  
+  "namespace.common": "Comum",
+  "namespace.ingestion": "Ingestão",
+  "namespace.wave2": "Wave 2",
+  
+  "button.add_key": "Adicionar Chave",
+  "button.edit": "Editar",
+  "button.delete": "Deletar",
+  "button.save": "Salvar",
+  "button.cancel": "Cancelar",
+  "button.export": "Exportar JSON",
+  "button.import": "Importar JSON",
+  
+  "form.key_label": "Chave de Tradução",
+  "form.key_placeholder": "Ex: button.save, home.title",
+  "form.namespace_label": "Namespace",
+  "form.pt_br_label": "Português (Brasil)",
+  "form.en_us_label": "English (USA)",
+  "form.es_es_label": "Español (España)",
+  "form.required": "Campo obrigatório",
+  "form.invalid_key": "Chave deve usar formato: namespace.name (apenas letras, números e underscore)",
+  
+  "modal.add_title": "Adicionar Nova Chave de Tradução",
+  "modal.edit_title": "Editar Chave de Tradução",
+  "modal.confirm_delete": "Tem certeza que deseja deletar esta chave?",
+  "modal.delete_warning": "Isso removerá a tradução em todos os idiomas.",
+  
+  "filter.namespace": "Filtrar por Namespace",
+  "filter.language": "Filtrar por Idioma",
+  "filter.all_namespaces": "Todos os Namespaces",
+  "filter.all_languages": "Todos os Idiomas",
+  
+  "message.success_create": "Chave de tradução criada com sucesso",
+  "message.success_update": "Chave de tradução atualizada com sucesso",
+  "message.success_delete": "Chave de tradução deletada com sucesso",
+  "message.error": "Erro ao processar tradução",
+  "message.loading": "Carregando traduções...",
+  
+  "validation.missing_pt_br": "Tradução em português é obrigatória",
+  "validation.missing_en_us": "Tradução em inglês é obrigatória",
+  "validation.missing_es_es": "Tradução em espanhol é obrigatória",
+  "validation.key_exists": "Esta chave de tradução já existe",
+  
+  "export.title": "Exportar Traduções",
+  "export.success": "Traduções exportadas com sucesso",
+  "import.title": "Importar Traduções",
+  "import.success": "Traduções importadas com sucesso",
+  "import.error": "Erro ao importar traduções. Verifique o formato do arquivo",
+  
+  "history.updated": "Última atualização",
+  "history.updated_by": "Atualizado por",
+  "history.created": "Criado em",
+  "history.version": "Versão"
+}

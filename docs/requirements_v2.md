@@ -408,6 +408,10 @@ Aplicáveis a todos os requisitos funcionais e não funcionais. Incluem métrica
 - **PT-01.01** Configurável via sistema (ex.: interface de admin com validação em tempo real).
 - **PT-01.02** Versionado (ex.: histórico de mudanças com diff visual).
 - **PT-01.03** Auditável (ex.: logs com timestamp e usuário, retenção mínima de 5 anos).
+- **PT-01.04** Separar modelo de instância (ex.: área de configurações para alterar campos, regras e atributos via sistema em modelos, classes, componentes ou telas).
+- **PT-01.05** Multilingua (ex.: labels e textos configuráveis para múltiplos idiomas, com idioma padrão definido no sistema e código implementado em EN-US).
+- **PT-01.06** Lista de Controle de Acesso (ex.: ações associadas a grupos de usuários, com verificação dinâmica de permissões antes da execução pelo usuário logado).
+- **PT-01.07** Integridade de dados (ex.: controle de CRUD por mudança de status, sem deleção de registros exceto por administrador do sistema).
 
 ### PT-02 – IA como Suporte, Nunca como Autoridade Final
 

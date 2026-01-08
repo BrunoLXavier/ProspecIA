@@ -271,6 +271,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         return {
             "id": "00000000-0000-0000-0000-000000000000",
+            "sub": "00000000-0000-0000-0000-000000000000",
             "username": "dev-user",
             "email": "dev@prospecai.local",
             "given_name": "Development",
