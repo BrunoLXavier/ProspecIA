@@ -467,7 +467,7 @@ async def seed_model_field_configurations(session: AsyncSession) -> None:
 
 async def seed_funding_sources(session: AsyncSession) -> dict[str, str]:
     """Seed 5 funding sources and return ID mapping."""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(datetime.UTC)
     funding_sources = [
         FundingSource(
             id=str(uuid4()),
@@ -567,7 +567,7 @@ async def seed_funding_sources(session: AsyncSession) -> dict[str, str]:
 
 async def seed_portfolio(session: AsyncSession) -> tuple[dict[str, str], dict[str, str]]:
     """Seed 3 institutes and 5 projects. Return ID mappings."""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(datetime.UTC)
 
     institutes = [
         Institute(
@@ -839,7 +839,7 @@ async def seed_clients(session: AsyncSession) -> dict[str, str]:
 
 async def seed_interactions(session: AsyncSession, client_mapping: dict[str, str]) -> None:
     """Seed 20 interactions distributed across clients."""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(datetime.UTC)
     interactions = []
 
     client_ids = list(client_mapping.values())
@@ -896,7 +896,7 @@ async def seed_opportunities(
     funding_mapping: dict[str, str],
 ) -> None:
     """Seed 20 opportunities in various pipeline stages."""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(datetime.UTC)
     opportunities = []
 
     client_ids = list(client_mapping.values())

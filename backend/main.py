@@ -20,7 +20,7 @@ from app.infrastructure.config.settings import get_settings
 from app.infrastructure.middleware.logging_middleware import LoggingMiddleware
 from app.infrastructure.middleware.auth_middleware import AuthMiddleware
 from app.infrastructure.middleware.acl_middleware import AclMiddleware
-from app.interfaces.http.routers import health, system, ingestao, consentimento
+from app.interfaces.http.routers import health, system, ingestion, consent
 from app.interfaces.http.routers import i18n
 from app.interfaces.http.routers import model_config
 from app.interfaces.http.routers import acl
@@ -69,14 +69,28 @@ async def lifespan(app: FastAPI):
         # Initialize Neo4j connection
         logger.info("initializing_neo4j")
         neo4j_conn.neo4j_connection = neo4j_conn.Neo4jConnection(settings)
-        await neo4j_conn.neo4j_connection.connect()
-        logger.info("neo4j_initialized")
+        try:
+            await neo4j_conn.neo4j_connection.connect()
+            logger.info("neo4j_initialized")
+        except Exception as e:
+            logger.error("neo4j_connection_failed", error=str(e))
+            if settings.DEBUG or settings.ENV.lower() in ("development", "dev"):
+                logger.warning("neo4j_startup_skipped_dev_mode")
+            else:
+                raise
         
         # Initialize Kafka producer
         logger.info("initializing_kafka")
         kafka_prod.kafka_producer = kafka_prod.KafkaProducerAdapter(settings)
-        kafka_prod.kafka_producer.connect()
-        logger.info("kafka_initialized")
+        try:
+            kafka_prod.kafka_producer.connect()
+            logger.info("kafka_initialized")
+        except Exception as e:
+            logger.error("kafka_connection_failed", error=str(e))
+            if settings.DEBUG or settings.ENV.lower() in ("development", "dev"):
+                logger.warning("kafka_startup_skipped_dev_mode")
+            else:
+                raise
 
         # Initialize MinIO client
         logger.info("initializing_minio")
@@ -156,7 +170,7 @@ def create_application() -> FastAPI:
     # Configure CORS (Cross-Origin Resource Sharing)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=settings.cors_origins_list,
         allow_credentials=settings.CORS_CREDENTIALS,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -179,16 +193,14 @@ def create_application() -> FastAPI:
     app.include_router(model_config.router, prefix="/system", tags=["System Config"])
     app.include_router(acl.router, prefix="/system", tags=["ACL"])
     app.include_router(translations.router, prefix="/system", tags=["Translations"])
-    app.include_router(ingestao.router)  # Already has prefix="/ingestions"
-    app.include_router(consentimento.router)  # Already has prefix="/consents"
+    app.include_router(ingestion.router, prefix="/ingestions", tags=["Ingestion"])
+    app.include_router(consent.router, prefix="/consents", tags=["Consent"])
     app.include_router(i18n.router, prefix="/i18n", tags=["i18n"])
-    
-    # Wave 2 routers
-    app.include_router(funding_sources.router)  # Already has prefix="/funding-sources"
-    app.include_router(clients.router)  # Already has prefix="/clients"
-    app.include_router(interactions.router)  # Already has prefix="/interactions"
-    app.include_router(portfolio.router)  # Already has prefix="/portfolio"
-    app.include_router(opportunities.router)  # Already has prefix="/opportunities"
+    app.include_router(funding_sources.router, prefix="/funding-sources", tags=["Funding Sources"])
+    app.include_router(clients.router, prefix="/clients", tags=["Clients"])
+    app.include_router(interactions.router, prefix="/interactions", tags=["Interactions"])
+    app.include_router(portfolio.router, prefix="/portfolio", tags=["Portfolio"])
+    app.include_router(opportunities.router, prefix="/opportunities", tags=["Opportunities"])
     
     # TODO: Register additional domain routers (future waves)
     # app.include_router(relatorios.router, prefix="/reports", tags=["Reports"])

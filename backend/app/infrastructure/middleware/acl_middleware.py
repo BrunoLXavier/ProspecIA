@@ -1,12 +1,12 @@
 from typing import Callable, Optional, Tuple
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Request, Response
+
 import structlog
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.adapters.postgres.connection import get_db_connection
-from app.infrastructure.repositories.acl_repository import ACLRepository
 from app.infrastructure.middleware.auth_middleware import get_current_user
-
+from app.infrastructure.repositories.acl_repository import ACLRepository
 
 logger = structlog.get_logger()
 
@@ -64,7 +64,10 @@ class AclMiddleware(BaseHTTPMiddleware):
                 allowed = await repo.is_allowed(session, roles, resource, action)
                 if not allowed:
                     from fastapi import HTTPException, status
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+                    )
         except Exception as e:
             logger.error("acl_middleware_error", error=str(e), path=path, method=method)
             # Fail closed only on explicit denial; otherwise proceed to avoid blocking

@@ -1,5 +1,5 @@
 """Unit tests for ClientsRepository."""
-from datetime import datetime
+from datetime import datetime, UTC
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -48,8 +48,8 @@ def sample_client():
         historico_atualizacoes=[],
         criado_por=UUID("00000000-0000-0000-0000-000000000123"),
         atualizado_por=UUID("00000000-0000-0000-0000-000000000123"),
-        criado_em=datetime.utcnow(),
-        atualizado_em=datetime.utcnow(),
+        criado_em=datetime.now(UTC),
+        atualizado_em=datetime.now(UTC),
     )
 
 
@@ -356,13 +356,13 @@ class TestClientsRepositoryHistory:
         # Arrange
         sample_client.historico_atualizacoes = [
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "usuario_id": str(uuid4()),
                 "acao": "atualizacao",
                 "campos": {"name": "Old Name"},
             },
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "usuario_id": str(uuid4()),
                 "acao": "atualizacao",
                 "campos": {"phone": "+55 11 88888-7777"},

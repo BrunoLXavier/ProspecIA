@@ -1,16 +1,16 @@
 """Repository for clients management (RF-04 CRM)."""
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, Optional, Sequence, List
-from uuid import UUID
-import inspect
 
-from sqlalchemy import select, func, or_
+import inspect
+from datetime import UTC, datetime
+from typing import Any, Dict, List, Optional, Sequence
+from uuid import UUID
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.kafka.producer import KafkaProducer
-from app.domain.client import Client, ClientStatus, ClientMaturity
 from app.domain.repositories.clients_protocol import ClientsRepositoryProtocol
+from app.infrastructure.models.client import Client, ClientMaturity, ClientStatus
 
 
 class ClientsRepository(ClientsRepositoryProtocol):
@@ -21,7 +21,9 @@ class ClientsRepository(ClientsRepositoryProtocol):
         self.kafka_producer = kafka_producer
 
     async def create(self, client: Client) -> Client:
-        """Persist a new client and emit audit event (ORM)."""
+        """Persist a new client and emit audit event."""
+        # Keep working with ORM for now to preserve compatibility
+        # Will transition to domain entity input in Phase 3
         add_result = self.session.add(client)
         if inspect.isawaitable(add_result):
             await add_result
@@ -68,14 +70,22 @@ class ClientsRepository(ClientsRepositoryProtocol):
         limit: int = 100,
     ) -> tuple[Sequence[Client], int]:
         """List clients with filters and pagination."""
-        base_query = select(Client).where(Client.tenant_id == tenant_id, Client.status != ClientStatus.EXCLUDED)
+        base_query = select(Client).where(
+            Client.tenant_id == tenant_id, Client.status != ClientStatus.EXCLUDED
+        )
         if status:
             base_query = base_query.where(Client.status == status)
         if maturity:
             base_query = base_query.where(Client.maturity == maturity)
         if search:
             search_pattern = f"%{search}%"
-            base_query = base_query.where(or_(Client.name.ilike(search_pattern), Client.email.ilike(search_pattern), Client.notes.ilike(search_pattern)))
+            base_query = base_query.where(
+                or_(
+                    Client.name.ilike(search_pattern),
+                    Client.email.ilike(search_pattern),
+                    Client.notes.ilike(search_pattern),
+                )
+            )
 
         query = base_query.order_by(Client.criado_em.desc()).offset(skip).limit(limit)
         result = await self.session.execute(query)
@@ -103,17 +113,19 @@ class ClientsRepository(ClientsRepositoryProtocol):
         updated_by: UUID,
         motivo: Optional[str] = None,
     ) -> Optional[Client]:
-        """Update client with history tracking (ORM)."""
+        """Update client with history tracking."""
         existing = await self.get(client_id, tenant_id, include_excluded=True)
         if not existing:
             return None
 
-        existing.add_history(campos=updates, usuario_id=updated_by, acao="atualizacao", motivo=motivo)
+        existing.add_history(
+            campos=updates, usuario_id=updated_by, acao="atualizacao", motivo=motivo
+        )
         for field, value in updates.items():
             if hasattr(existing, field):
                 setattr(existing, field, value)
         existing.atualizado_por = updated_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
@@ -147,9 +159,14 @@ class ClientsRepository(ClientsRepositoryProtocol):
         if not existing:
             return False
         existing.status = ClientStatus.EXCLUDED
-        existing.add_history({"status": ClientStatus.EXCLUDED.value}, usuario_id=deleted_by, acao="exclusao", motivo=motivo)
+        existing.add_history(
+            {"status": ClientStatus.EXCLUDED.value},
+            usuario_id=deleted_by,
+            acao="exclusao",
+            motivo=motivo,
+        )
         existing.atualizado_por = deleted_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):

@@ -10,7 +10,7 @@ Wave 2 - RF-02: Gestão de Fontes de Fomento
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.funding_source import FundingSource, FundingSourceStatus, FundingSourceType
@@ -63,8 +63,8 @@ async def test_create_funding_source(mock_session, mock_kafka_producer, sample_f
     mock_result = MagicMock()
     mock_result.fetchone.return_value = (
         uuid4(),  # id
-        datetime.utcnow(),  # criado_em
-        datetime.utcnow(),  # atualizado_em
+        datetime.now(UTC),  # criado_em
+        datetime.now(UTC),  # atualizado_em
     )
     mock_session.execute.return_value = mock_result
     
@@ -120,8 +120,8 @@ async def test_find_by_id_with_rls(mock_session, mock_kafka_producer):
         [],
         UUID("00000000-0000-0000-0000-000000000001"),
         UUID("00000000-0000-0000-0000-000000000001"),
-        datetime.utcnow(),
-        datetime.utcnow(),
+        datetime.now(UTC),
+        datetime.now(UTC),
     )
     mock_session.execute.return_value = mock_result
     
@@ -244,7 +244,7 @@ async def test_update_with_versioning(mock_session, mock_kafka_producer):
         
         # Mock database update
         mock_result = MagicMock()
-        mock_result.fetchone.return_value = (datetime.utcnow(),)
+        mock_result.fetchone.return_value = (datetime.now(UTC),)
         mock_session.execute.return_value = mock_result
         
         # Act

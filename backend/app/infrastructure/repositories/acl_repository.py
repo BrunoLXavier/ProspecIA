@@ -1,8 +1,9 @@
-from typing import Any, Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _serialize_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -19,7 +20,9 @@ def _serialize_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class ACLRepository:
-    async def is_allowed(self, session: AsyncSession, roles: List[str], resource: str, action: str) -> bool:
+    async def is_allowed(
+        self, session: AsyncSession, roles: List[str], resource: str, action: str
+    ) -> bool:
         if not roles:
             return False
         query = text(
@@ -36,25 +39,32 @@ class ACLRepository:
         return result.first() is not None
 
     async def list_rules(self, session: AsyncSession) -> List[Dict[str, Any]]:
-        res = await session.execute(text(
-            """SELECT id, role, resource, action, condition, description, created_at, updated_at, created_by
+        res = await session.execute(
+            text(
+                """SELECT id, role, resource, action, condition, description, created_at, updated_at, created_by
                  FROM acl_rules ORDER BY role, resource, action"""
-        ))
+            )
+        )
         return [_serialize_row(dict(r)) for r in res.mappings().all()]
 
     async def create_rule(self, session: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
-        res = await session.execute(text(
-            """
+        res = await session.execute(
+            text(
+                """
             INSERT INTO acl_rules (id, role, resource, action, condition, description)
             VALUES (gen_random_uuid(), :role, :resource, :action, :condition, :description)
             RETURNING id, role, resource, action, condition, description, created_at, updated_at, created_by
             """
-        ), data)
+            ),
+            data,
+        )
         row = res.mappings().first()
         await session.commit()
         return _serialize_row(dict(row))
 
-    async def update_rule(self, session: AsyncSession, rule_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_rule(
+        self, session: AsyncSession, rule_id: str, data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         set_parts = []
         params: Dict[str, Any] = {"id": rule_id}
         for key in ("role", "resource", "action", "condition", "description"):
@@ -62,18 +72,25 @@ class ACLRepository:
                 set_parts.append(f"{key} = :{key}")
                 params[key] = data[key]
         if not set_parts:
-            res = await session.execute(text(
-                "SELECT id, role, resource, action, condition, description, created_at, updated_at, created_by FROM acl_rules WHERE id = :id"
-            ), params)
+            res = await session.execute(
+                text(
+                    "SELECT id, role, resource, action, condition, description, "
+                    "created_at, updated_at, created_by FROM acl_rules WHERE id = :id"
+                ),
+                params,
+            )
             row = res.mappings().first()
             return _serialize_row(dict(row)) if row else None
         set_clause = ", ".join(set_parts) + ", updated_at = NOW()"
-        res = await session.execute(text(
-            f"""
+        res = await session.execute(
+            text(
+                f"""
             UPDATE acl_rules SET {set_clause} WHERE id = :id
             RETURNING id, role, resource, action, condition, description, created_at, updated_at, created_by
             """
-        ), params)
+            ),
+            params,
+        )
         row = res.mappings().first()
         if row:
             await session.commit()

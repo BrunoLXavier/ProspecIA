@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/lib/hooks/useI18n'
+import Link from 'next/link'
 
 type ACLRule = {
   id: string
@@ -93,7 +94,7 @@ export default function ACLPage() {
           </div>
         </div>
         <div className="mt-3 text-right">
-          <button className="border rounded px-3 py-1 text-sm hover:bg-gray-50" onClick={createRule}>{t('acl.create_rule')}</button>
+          <button className="bg-primary-600 text-white rounded px-4 py-2 text-sm font-semibold shadow hover:bg-primary-700 transition" onClick={createRule}>{t('acl.create_rule')}</button>
         </div>
       </div>
 
@@ -122,7 +123,7 @@ export default function ACLPage() {
                   <td className="px-3 py-2">{r.condition || '-'}</td>
                   <td className="px-3 py-2">{r.description || '-'}</td>
                   <td className="px-3 py-2 text-right">
-                    <button className="border rounded px-3 py-1 text-sm hover:bg-gray-50" onClick={() => deleteRule(r.id)}>{t('acl.delete_rule')}</button>
+                    <button className="bg-red-600 text-white rounded px-4 py-2 text-sm font-semibold shadow hover:bg-red-700 transition" onClick={() => deleteRule(r.id)}>{t('acl.delete_rule')}</button>
                   </td>
                 </tr>
               ))}
@@ -130,6 +131,9 @@ export default function ACLPage() {
           </table>
         </div>
       )}
+        <div className="mt-8">
+          <Link href="/" className="btn-primary">← {t('dashboard.back_home')}</Link>
+        </div>
     </div>
   )
 }

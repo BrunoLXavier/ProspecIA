@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/lib/hooks/useI18n'
 import { get, post, patch, del } from '@/lib/api/client'
 import toast from 'react-hot-toast'
+import Link from 'next/link'
 
 type TranslationKey = {
   id: string
@@ -180,13 +181,13 @@ export default function TranslationsAdminPage() {
           <div className="flex gap-2">
             <button
               onClick={() => handleOpenModal()}
-              className="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700"
+              className="flex-1 bg-primary-600 text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-700 transition"
             >
               {t('admin:button.add_key')}
             </button>
             <button
               onClick={handleExport}
-              className="flex-1 bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700"
+              className="flex-1 bg-green-600 text-white rounded px-4 py-2 font-semibold shadow hover:bg-green-700 transition"
             >
               {t('admin:button.export')}
             </button>
@@ -233,13 +234,13 @@ export default function TranslationsAdminPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleOpenModal(item)}
-                          className="text-blue-600 hover:underline"
+                          className="text-primary-600 font-semibold hover:underline"
                         >
                           {t('admin:button.edit')}
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:underline"
+                          className="text-red-600 font-semibold hover:underline"
                         >
                           {t('admin:button.delete')}
                         </button>
@@ -319,13 +320,13 @@ export default function TranslationsAdminPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleSave}
-                className="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700"
+                className="flex-1 bg-primary-600 text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-700 transition"
               >
                 {t('admin:button.save')}
               </button>
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 border rounded px-4 py-2 hover:bg-gray-50"
+                className="flex-1 border rounded px-4 py-2 font-semibold shadow hover:bg-gray-50 transition"
               >
                 {t('admin:button.cancel')}
               </button>
@@ -333,6 +334,9 @@ export default function TranslationsAdminPage() {
           </div>
         </div>
       )}
+        <div className="mt-8">
+          <Link href="/" className="btn-primary">← {t('dashboard.back_home')}</Link>
+        </div>
     </div>
   )
 }

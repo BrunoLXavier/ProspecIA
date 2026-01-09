@@ -1,14 +1,20 @@
 """Repository for client interactions management (RF-04 CRM)."""
-from datetime import datetime
+
+import inspect
+from datetime import UTC, datetime
 from typing import Any, Dict, Optional, Sequence
 from uuid import UUID
-import inspect
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.interaction import Interaction, InteractionType, InteractionOutcome, InteractionStatus
 from app.adapters.kafka.producer import KafkaProducer
+from app.infrastructure.models.interaction import (
+    Interaction,
+    InteractionOutcome,
+    InteractionStatus,
+    InteractionType,
+)
 
 
 class InteractionsRepository:
@@ -101,7 +107,9 @@ class InteractionsRepository:
         limit: int = 100,
     ) -> tuple[Sequence[Interaction], int]:
         """List all interactions with filters and pagination."""
-        base_query = select(Interaction).where(Interaction.tenant_id == tenant_id, Interaction.status != InteractionStatus.EXCLUDED)
+        base_query = select(Interaction).where(
+            Interaction.tenant_id == tenant_id, Interaction.status != InteractionStatus.EXCLUDED
+        )
         if outcome:
             base_query = base_query.where(Interaction.outcome == outcome)
         if status:
@@ -141,7 +149,7 @@ class InteractionsRepository:
                 setattr(existing, key, value)
         existing.add_history(updates, existing.criado_por, "atualizacao")
         existing.atualizado_por = existing.criado_por
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
@@ -169,8 +177,12 @@ class InteractionsRepository:
         if not existing:
             return False
         existing.status = InteractionStatus.CANCELLED
-        existing.add_history({"status": InteractionStatus.CANCELLED.value}, usuario_id=existing.criado_por, acao="exclusao")
-        existing.atualizado_em = datetime.utcnow()
+        existing.add_history(
+            {"status": InteractionStatus.CANCELLED.value},
+            usuario_id=existing.criado_por,
+            acao="exclusao",
+        )
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):

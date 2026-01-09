@@ -3,10 +3,11 @@
 Encapsulates orchestration and guards so FastAPI routers stay thin and the
 use cases depend on abstractions rather than infrastructure.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -49,8 +50,8 @@ class ClientsService:
             historico_atualizacoes=[],
             criado_por=context.user_id,
             atualizado_por=context.user_id,
-            criado_em=datetime.utcnow(),
-            atualizado_em=datetime.utcnow(),
+            criado_em=datetime.now(UTC),
+            atualizado_em=datetime.now(UTC),
         )
 
         created = await self.repository.create(client)
@@ -89,7 +90,9 @@ class ClientsService:
             Client.validate_cnpj(updates["cnpj"])
 
         if "status" in updates:
-            existing = await self.repository.get(client_id, context.tenant_id, include_excluded=True)
+            existing = await self.repository.get(
+                client_id, context.tenant_id, include_excluded=True
+            )
             if not existing:
                 return None
             if not existing.can_transition_to(updates["status"]):

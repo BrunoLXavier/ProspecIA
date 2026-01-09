@@ -6,37 +6,41 @@ Implements:
 """
 
 from uuid import UUID
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from app.adapters.postgres.connection import get_session
-from app.domain.repositories.consentimento_repository import ConsentimentoRepository
 from app.infrastructure.middleware.auth_middleware import get_current_user
+from app.infrastructure.repositories.consent_repository import ConsentimentoRepository
+from app.infrastructure.services.audit_logger import KafkaAuditLogger
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/consents", tags=["Consent"])
 
 
+def get_audit_logger() -> KafkaAuditLogger:
+    return KafkaAuditLogger()
+
+
 @router.get("/{id}", summary="Get Consent")
 async def get_consentimento(
-    id: UUID,
-    session: AsyncSession = Depends(get_session),
-    user: dict = Depends(get_current_user)
+    id: UUID, session: AsyncSession = Depends(get_session), user: dict = Depends(get_current_user)
 ):
     """Get consent details by ID."""
     try:
-        consent_repo = ConsentimentoRepository(session)
+        consent_repo = ConsentimentoRepository(session, audit_logger=get_audit_logger())
         tenant_id = user.get("tenant_id", "nacional")
-        
+
         consent = await consent_repo.get_by_id(id, tenant_id=tenant_id)
-        
+
         if not consent:
             raise HTTPException(status_code=404, detail="Consent not found")
-        
+
         logger.info("consent_retrieved", consent_id=str(id))
-        
+
         return {
             "id": consent.id,
             "versao": consent.versao,
@@ -54,7 +58,7 @@ async def get_consentimento(
             "base_legal": consent.base_legal,
             "data_expiracao": consent.data_expiracao,
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:

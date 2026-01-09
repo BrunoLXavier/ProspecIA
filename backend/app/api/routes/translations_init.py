@@ -3,15 +3,15 @@ Initialize default translations into the in-memory database when the API starts.
 This ensures the application has all necessary translation keys from the beginning.
 """
 
-from datetime import datetime
-from app.api.routes.translations import TranslationSchema, TRANSLATIONS_DB
+from app.api.routes.translations import TRANSLATIONS_DB, TranslationSchema
+
 
 def initialize_default_translations():
     """
     Load default translations from JSON files and populate the in-memory database.
     This is called during application startup.
     """
-    
+
     # Define default translations for all namespaces
     DEFAULT_TRANSLATIONS = [
         # Common translations
@@ -26,8 +26,11 @@ def initialize_default_translations():
             "key": "app.description",
             "namespace": "common",
             "pt_br": "Sistema Inteligente de Prospecção e Gestão de Pesquisas com IA Responsável",
-            "en_us": "Intelligent Research Prospecting and Management System with Responsible AI",
-            "es_es": "Sistema Inteligente de Prospección y Gestión de Investigación con IA Responsable",
+            "en_us": "Intelligent Prospecting and Management with Responsible AI",
+            "es_es": (
+                "Sistema Inteligente de Prospección y Gestión de "
+                "Investigación con IA Responsable"
+            ),
         },
         {
             "key": "nav.home",
@@ -108,19 +111,19 @@ def initialize_default_translations():
             "es_es": "Cancelar",
         },
     ]
-    
+
     # Load translations into in-memory database
     for trans in DEFAULT_TRANSLATIONS:
         composite_key = f"{trans['namespace']}:{trans['key']}"
-        
+
         if composite_key not in TRANSLATIONS_DB:
             translation = TranslationSchema(
                 id=composite_key,
-                key=trans['key'],
-                namespace=trans['namespace'],
-                pt_br=trans['pt_br'],
-                en_us=trans['en_us'],
-                es_es=trans['es_es'],
+                key=trans["key"],
+                namespace=trans["namespace"],
+                pt_br=trans["pt_br"],
+                en_us=trans["en_us"],
+                es_es=trans["es_es"],
                 created_by="system",
                 updated_by="system",
             )

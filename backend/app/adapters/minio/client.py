@@ -7,11 +7,12 @@ and small object sampling for lineage previews.
 Follows SRP and DIP: wraps MinIO client behind an adapter.
 """
 
-from typing import Optional
 from datetime import timedelta
+from typing import Optional
+
+import structlog
 from minio import Minio
 from minio.error import S3Error
-import structlog
 
 from app.infrastructure.config.settings import Settings
 from app.infrastructure.patterns.resilience import CircuitBreaker, retry
@@ -83,7 +84,9 @@ class MinioClientAdapter:
                 length=len(data),
                 content_type=content_type or "application/octet-stream",
             )
-            logger.info("minio_upload_success", bucket=bucket, object_name=object_name, size=len(data))
+            logger.info(
+                "minio_upload_success", bucket=bucket, object_name=object_name, size=len(data)
+            )
             self._cb.record_success()
             return object_name
         except S3Error as e:

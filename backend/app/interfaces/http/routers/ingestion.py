@@ -9,79 +9,83 @@ Implements:
 - GET /ingestions/{id}/lgpd-report: Get LGPD compliance report
 """
 
-from typing import Optional
-import time
-import json
 import csv
 import io
+import json
+import time
+from datetime import UTC, datetime
+from typing import Optional
 from uuid import UUID, uuid4
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.postgres.connection import get_session
-from app.adapters.neo4j.connection import get_neo4j_connection
-from app.domain.models.ingestao import Ingestao, IngestionStatus, IngestionMethod, IngestionSource
-from app.domain.repositories.ingestao_repository import IngestaoRepository
-from app.domain.repositories.consentimento_repository import ConsentimentoRepository
-from app.infrastructure.middleware.auth_middleware import get_current_user, require_roles
 from app.adapters.minio.client import get_minio_client
+from app.adapters.neo4j.connection import get_neo4j_connection
+from app.adapters.postgres.connection import get_session
+from app.domain.models.ingestion import Ingestao, IngestionMethod, IngestionSource, IngestionStatus
+from app.infrastructure.middleware.auth_middleware import get_current_user, require_roles
 from app.infrastructure.monitoring.metrics import (
+    ingestao_confiabilidade_score,
+    ingestao_errors_total,
+    ingestao_processing_time,
     ingestoes_created_total,
     ingestoes_status,
-    ingestao_confiabilidade_score,
-    lgpd_pii_detected_total,
     lgpd_consent_validation,
-    ingestao_processing_time,
-    ingestao_errors_total,
+    lgpd_pii_detected_total,
+)
+from app.infrastructure.repositories.consent_repository import ConsentimentoRepository
+from app.infrastructure.repositories.ingestion_repository import IngestaoRepository
+from app.infrastructure.services.audit_logger import KafkaAuditLogger
+from app.interfaces.http.schemas.ingestion import (
+    IngestionCreateResponse,
+    IngestionDetailResponse,
+    IngestionListItem,
+    IngestionListResponse,
+    LGPDReportResponse,
+    LineageEdge,
+    LineageNode,
+    LineageResponse,
 )
 from app.use_cases.lgpd_agent import get_lgpd_agent
-from app.interfaces.http.schemas.ingestao import (
-    IngestionCreateRequest,
-    IngestionCreateResponse,
-    IngestionListResponse,
-    IngestionListItem,
-    IngestionDetailResponse,
-    LineageResponse,
-    LineageNode,
-    LineageEdge,
-    LGPDReportResponse
-)
-
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/ingestions", tags=["Ingestion"])
 
 
+def get_audit_logger() -> KafkaAuditLogger:
+    """Factory for audit logger to avoid tight coupling in handlers."""
+    return KafkaAuditLogger()
+
+
 def extract_sample_data(file_content: bytes, file_extension: str, max_samples: int = 3) -> dict:
     """
     Extract sample data from uploaded file for preview.
-    
+
     Supports: CSV, JSON, TXT (as raw text)
     Returns: {"dados_sample": [...], "total_registros": int, "registros_validos": int}
     """
     try:
-        if file_extension.lower() == 'csv':
+        if file_extension.lower() == "csv":
             # Try multiple encodings
             text_content = None
-            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+            for encoding in ["utf-8", "latin-1", "iso-8859-1", "cp1252"]:
                 try:
                     text_content = file_content.decode(encoding)
                     break
                 except UnicodeDecodeError:
                     continue
-            
+
             if text_content is None:
                 return {
                     "dados_sample": [],
                     "total_registros": 0,
                     "registros_validos": 0,
-                    "registros_invalidos": 0
+                    "registros_invalidos": 0,
                 }
-            
+
             reader = csv.DictReader(io.StringIO(text_content))
             rows = []
             total = 0
@@ -93,36 +97,36 @@ def extract_sample_data(file_content: bytes, file_extension: str, max_samples: i
                 "dados_sample": rows,
                 "total_registros": total,
                 "registros_validos": total,  # Simplified - assume all valid for now
-                "registros_invalidos": 0
+                "registros_invalidos": 0,
             }
-        
-        elif file_extension.lower() == 'json':
+
+        elif file_extension.lower() == "json":
             # Try multiple encodings for JSON
             text_content = None
-            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+            for encoding in ["utf-8", "latin-1", "iso-8859-1", "cp1252"]:
                 try:
                     text_content = file_content.decode(encoding)
                     break
                 except UnicodeDecodeError:
                     continue
-            
+
             if text_content is None:
                 return {
                     "dados_sample": [],
                     "total_registros": 0,
                     "registros_validos": 0,
-                    "registros_invalidos": 0
+                    "registros_invalidos": 0,
                 }
-            
+
             data = json.loads(text_content)
-            
+
             # Handle array of objects
             if isinstance(data, list):
                 return {
                     "dados_sample": data[:max_samples],
                     "total_registros": len(data),
                     "registros_validos": len(data),
-                    "registros_invalidos": 0
+                    "registros_invalidos": 0,
                 }
             # Handle object with data key
             elif isinstance(data, dict) and "data" in data:
@@ -131,58 +135,58 @@ def extract_sample_data(file_content: bytes, file_extension: str, max_samples: i
                     "dados_sample": items[:max_samples],
                     "total_registros": len(items),
                     "registros_validos": len(items),
-                    "registros_invalidos": 0
+                    "registros_invalidos": 0,
                 }
             else:
                 return {
                     "dados_sample": [data] if not isinstance(data, list) else data[:max_samples],
                     "total_registros": 1 if not isinstance(data, list) else len(data),
                     "registros_validos": 1 if not isinstance(data, list) else len(data),
-                    "registros_invalidos": 0
+                    "registros_invalidos": 0,
                 }
-        
-        elif file_extension.lower() in ['txt', 'xml']:
+
+        elif file_extension.lower() in ["txt", "xml"]:
             # For text files, try multiple encodings
             text_content = None
-            for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+            for encoding in ["utf-8", "latin-1", "iso-8859-1", "cp1252"]:
                 try:
                     text_content = file_content.decode(encoding)
                     break
                 except UnicodeDecodeError:
                     continue
-            
+
             if text_content is None:
                 return {
                     "dados_sample": [],
                     "total_registros": 0,
                     "registros_validos": 0,
-                    "registros_invalidos": 0
+                    "registros_invalidos": 0,
                 }
-            
-            lines = text_content.split('\n')[:max_samples]
+
+            lines = text_content.split("\n")[:max_samples]
             return {
                 "dados_sample": [{"conteudo": line} for line in lines if line.strip()],
                 "total_registros": len(lines),
-                "registros_validos": len([l for l in lines if l.strip()]),
-                "registros_invalidos": len([l for l in lines if not l.strip()])
+                "registros_validos": len([line for line in lines if line.strip()]),
+                "registros_invalidos": len([line for line in lines if not line.strip()]),
             }
-        
+
         else:
             # Unsupported format - return empty sample
             return {
                 "dados_sample": [],
                 "total_registros": 0,
                 "registros_validos": 0,
-                "registros_invalidos": 0
+                "registros_invalidos": 0,
             }
-    
+
     except Exception as e:
         logger.warning("sample_extraction_failed", error=str(e), file_extension=file_extension)
         return {
             "dados_sample": [],
             "total_registros": 0,
             "registros_validos": 0,
-            "registros_invalidos": 0
+            "registros_invalidos": 0,
         }
 
 
@@ -204,7 +208,7 @@ async def create_ingestao(
 ):
     """
     Create new data ingestion with file upload.
-    
+
     - Validates file size (≤100MB)
     - Uploads file to MinIO
     - Processes with LGPD agent
@@ -218,49 +222,62 @@ async def create_ingestao(
         file_content = await file.read()
         if len(file_content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="File size exceeds 10GB limit")
-        
+
         # Validate file extension
-        ALLOWED_EXTENSIONS = ['csv', 'xlsx', 'xls', 'json', 'xml', 'txt', 'parquet', 'avro', 'pdf', 'doc', 'docx']
-        file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+        ALLOWED_EXTENSIONS = [
+            "csv",
+            "xlsx",
+            "xls",
+            "json",
+            "xml",
+            "txt",
+            "parquet",
+            "avro",
+            "pdf",
+            "doc",
+            "docx",
+        ]
+        file_extension = file.filename.split(".")[-1].lower() if "." in file.filename else ""
         if file_extension not in ALLOWED_EXTENSIONS:
             raise HTTPException(
-                status_code=400, 
-                detail=f"File extension '{file_extension}' not allowed. Supported: {', '.join(ALLOWED_EXTENSIONS)}"
+                status_code=400,
+                detail=f"File extension '{file_extension}' not allowed. Supported: {', '.join(ALLOWED_EXTENSIONS)}",
             )
-        
+
         # Generate UUID for ingestion
         ingestao_id = uuid4()
-        
+
         # MinIO storage path: ingestoes/{uuid}.{extension}
         storage_path = f"ingestoes/{ingestao_id}.{file_extension}"
-        
+
         # Upload to MinIO
         minio = get_minio_client()
         minio.upload_bytes(storage_path, file_content, content_type=file.content_type)
         logger.info("file_uploaded", storage_path=storage_path, size_bytes=len(file_content))
-        
+
         # Process with LGPD agent
         lgpd_agent = get_lgpd_agent()
+        # Instantiate consent repository without audit logger to keep tests compatible
         consent_repo = ConsentimentoRepository(session)
-        
+
         # Convert file content to text (simple approach, could use pandas for CSV/Excel)
         try:
-            text_content = file_content.decode('utf-8')
+            text_content = file_content.decode("utf-8")
         except UnicodeDecodeError:
             text_content = ""  # Binary file, skip LGPD processing
-        
+
         lgpd_result = await lgpd_agent.process_ingestao(
             text_content=text_content,
             consentimento_id=consentimento_id,
             titular_id=None,  # Extract from file if available
             finalidade="Análise de dados econômicos",
             ingestao_id=ingestao_id,
-            repository=consent_repo
+            repository=consent_repo,
         )
-        
+
         # Extract sample data from file
         sample_data = extract_sample_data(file_content, file_extension)
-        
+
         # Create ingestion entity
         ingestao = Ingestao(
             id=ingestao_id,
@@ -278,24 +295,24 @@ async def create_ingestao(
             historico_atualizacoes=[],
             criado_por=UUID(user["sub"]),
             tenant_id=user.get("tenant_id", "nacional"),
-            data_ingestao=datetime.utcnow(),
-            data_criacao=datetime.utcnow(),
-            data_atualizacao=datetime.utcnow(),
+            data_ingestao=datetime.now(UTC),
+            data_criacao=datetime.now(UTC),
+            data_atualizacao=datetime.now(UTC),
             descricao=descricao,
             total_registros=sample_data.get("total_registros", 0),
             registros_validos=sample_data.get("registros_validos", 0),
             registros_invalidos=sample_data.get("registros_invalidos", 0),
-            metadata_adicional={
-                "dados_sample": sample_data.get("dados_sample", [])
-            }
+            metadata_adicional={"dados_sample": sample_data.get("dados_sample", [])},
         )
-        
+
         # Save to database
         ingestao_repo = IngestaoRepository(session)
         ip_cliente = request.client.host if request.client else None
-        created_ingestao = await ingestao_repo.create(ingestao, usuario_id=str(user["id"]), ip_cliente=ip_cliente)
+        created_ingestao = await ingestao_repo.create(
+            ingestao, usuario_id=str(user["id"]), ip_cliente=ip_cliente
+        )
         await session.commit()
-        
+
         # Create lineage node in Neo4j
         neo4j = get_neo4j_connection()
         if neo4j:
@@ -308,24 +325,28 @@ async def create_ingestao(
                         "metodo": metodo.value,
                         "arquivo": file.filename,
                         "data_ingestao": ingestao.data_ingestao.isoformat(),
-                        "confiabilidade": lgpd_result["compliance_score"]
-                    }
+                        "confiabilidade": lgpd_result["compliance_score"],
+                    },
                 )
                 logger.info("lineage_node_created", ingestao_id=str(ingestao_id))
             except Exception as e:
                 logger.error("lineage_creation_failed", error=str(e))
-        
+
         # Metrics instrumentation
         try:
             ingestoes_created_total.labels(fonte=fonte.value).inc()
             ingestoes_status.labels(status=IngestionStatus.PROCESSANDO.value).inc()
-            ingestao_confiabilidade_score.labels(fonte=fonte.value).set(lgpd_result["compliance_score"])
+            ingestao_confiabilidade_score.labels(fonte=fonte.value).set(
+                lgpd_result["compliance_score"]
+            )
             # PII counts
             for pii_type, entities in (lgpd_result.get("pii_detected") or {}).items():
                 if entities:
                     lgpd_pii_detected_total.labels(pii_type=pii_type).inc(len(entities))
             # Consent status
-            consent_status = "granted" if lgpd_result.get("consent_validation", {}).get("valid") else "missing"
+            consent_status = (
+                "granted" if lgpd_result.get("consent_validation", {}).get("valid") else "missing"
+            )
             lgpd_consent_validation.labels(status=consent_status).inc()
         except Exception:
             # Avoid breaking flow on metrics failure
@@ -348,17 +369,22 @@ async def create_ingestao(
         )
         await session.commit()
 
-        logger.info("ingestao_created", ingestao_id=str(ingestao_id), fonte=fonte.value, compliance_score=lgpd_result["compliance_score"])
-        
+        logger.info(
+            "ingestao_created",
+            ingestao_id=str(ingestao_id),
+            fonte=fonte.value,
+            compliance_score=lgpd_result["compliance_score"],
+        )
+
         return IngestionCreateResponse(
             id=created_ingestao.id,
             fonte=created_ingestao.fonte.value,
             status=created_ingestao.status.value,
             arquivo_storage_path=created_ingestao.arquivo_storage_path,
             confiabilidade_score=created_ingestao.confiabilidade_score,
-            data_ingestao=created_ingestao.data_ingestao
+            data_ingestao=created_ingestao.data_ingestao,
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -377,41 +403,40 @@ async def list_ingestoes(
     offset: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=100, description="Pagination limit"),
     session: AsyncSession = Depends(get_session),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     List ingestions with filters and pagination.
-    
+
     Applies RLS filtering by tenant_id.
     """
     try:
         ingestao_repo = IngestaoRepository(session)
-        
+
         filters = {}
         if fonte:
             filters["fonte"] = fonte
         if status:
             filters["status"] = status
-        
+
         # Apply tenant filtering (RLS)
         tenant_id = user.get("tenant_id", "nacional")
-        
+
         items, total = await ingestao_repo.list_with_filters(
-            tenant_id=tenant_id,
-            offset=offset,
-            limit=limit,
-            **filters
+            tenant_id=tenant_id, offset=offset, limit=limit, **filters
         )
-        
-        logger.info("ingestoes_listed", total=total, offset=offset, limit=limit, tenant_id=tenant_id)
-        
+
+        logger.info(
+            "ingestoes_listed", total=total, offset=offset, limit=limit, tenant_id=tenant_id
+        )
+
         return IngestionListResponse(
             items=[IngestionListItem.model_validate(item) for item in items],
             total=total,
             offset=offset,
-            limit=limit
+            limit=limit,
         )
-    
+
     except Exception as e:
         logger.error("list_ingestoes_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to list ingestions: {str(e)}")
@@ -419,33 +444,31 @@ async def list_ingestoes(
 
 @router.get("/{id}", response_model=IngestionDetailResponse, summary="Get Ingestion")
 async def get_ingestao(
-    id: UUID,
-    session: AsyncSession = Depends(get_session),
-    user: dict = Depends(get_current_user)
+    id: UUID, session: AsyncSession = Depends(get_session), user: dict = Depends(get_current_user)
 ):
     """Get ingestion details by ID with data sample."""
     try:
         ingestao_repo = IngestaoRepository(session)
         tenant_id = user.get("tenant_id", "nacional")
-        
+
         ingestao = await ingestao_repo.get_by_id(id, tenant_id=tenant_id)
-        
+
         if not ingestao:
             raise HTTPException(status_code=404, detail="Ingestion not found")
-        
+
         # Try to get a sample of the raw data from metadata
         dados_sample = None
         if ingestao.metadata_adicional and isinstance(ingestao.metadata_adicional, dict):
             dados_sample = ingestao.metadata_adicional.get("dados_sample")
-        
+
         logger.info("ingestao_retrieved", ingestao_id=str(id))
-        
+
         # Build response with sample data
         response_data = IngestionDetailResponse.model_validate(ingestao).model_dump()
         response_data["dados_brutos_sample"] = dados_sample
-        
+
         return response_data
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -458,11 +481,11 @@ async def get_linhagem(
     id: UUID,
     max_depth: int = Query(5, ge=1, le=10, description="Maximum graph depth"),
     session: AsyncSession = Depends(get_session),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     Get data lineage graph for ingestion.
-    
+
     Returns nodes and edges for visualization.
     """
     try:
@@ -470,58 +493,64 @@ async def get_linhagem(
         ingestao_repo = IngestaoRepository(session)
         tenant_id = user.get("tenant_id", "nacional")
         ingestao = await ingestao_repo.get_by_id(id, tenant_id=tenant_id)
-        
+
         if not ingestao:
             raise HTTPException(status_code=404, detail="Ingestion not found")
-        
+
         # Query Neo4j lineage
         neo4j = get_neo4j_connection()
         if not neo4j:
             raise HTTPException(status_code=503, detail="Lineage service unavailable")
-        
+
         lineage_path = await neo4j.get_lineage_path(str(id), max_depth=max_depth)
-        
+
         # Parse lineage into nodes and edges
         nodes = []
         edges = []
-        
+
         # Add root ingestion node
-        nodes.append(LineageNode(
-            id=str(ingestao.id),
-            type="ingestao",
-            label=f"{ingestao.fonte.value} - {ingestao.arquivo_original or 'Unknown'}",
-            properties={
-                "fonte": ingestao.fonte.value,
-                "metodo": ingestao.metodo.value,
-                "confiabilidade": ingestao.confiabilidade_score,
-                "status": ingestao.status.value
-            }
-        ))
-        
+        nodes.append(
+            LineageNode(
+                id=str(ingestao.id),
+                type="ingestao",
+                label=f"{ingestao.fonte.value} - {ingestao.arquivo_original or 'Unknown'}",
+                properties={
+                    "fonte": ingestao.fonte.value,
+                    "metodo": ingestao.metodo.value,
+                    "confiabilidade": ingestao.confiabilidade_score,
+                    "status": ingestao.status.value,
+                },
+            )
+        )
+
         # Add transformation nodes from lineage_path
         for i, item in enumerate(lineage_path):
             if item.get("type") == "transformation":
                 node_id = f"transform_{i}"
-                nodes.append(LineageNode(
-                    id=node_id,
-                    type="transformation",
-                    label=item.get("name", "Transformation"),
-                    properties=item.get("properties", {})
-                ))
-                edges.append(LineageEdge(
-                    source=str(ingestao.id),
-                    target=node_id,
-                    type="TRANSFORMED_BY",
-                    properties={}
-                ))
-        
+                nodes.append(
+                    LineageNode(
+                        id=node_id,
+                        type="transformation",
+                        label=item.get("name", "Transformation"),
+                        properties=item.get("properties", {}),
+                    )
+                )
+                edges.append(
+                    LineageEdge(
+                        source=str(ingestao.id),
+                        target=node_id,
+                        type="TRANSFORMED_BY",
+                        properties={},
+                    )
+                )
+
         # Transformation steps
         transformacoes = ["upload", "lgpd_processing"]
         if ingestao.pii_detectado:
             transformacoes.append("pii_detection")
         if ingestao.acoes_lgpd:
             transformacoes.append("pii_masking")
-        
+
         # Sample raw data from MinIO (if text)
         dados_sample = None
         try:
@@ -531,8 +560,10 @@ async def get_linhagem(
         except Exception:
             dados_sample = None
 
-        logger.info("lineage_retrieved", ingestao_id=str(id), nodes_count=len(nodes), edges_count=len(edges))
-        
+        logger.info(
+            "lineage_retrieved", ingestao_id=str(id), nodes_count=len(nodes), edges_count=len(edges)
+        )
+
         return LineageResponse(
             ingestao_id=ingestao.id,
             nodes=nodes,
@@ -540,9 +571,9 @@ async def get_linhagem(
             dados_brutos_sample=dados_sample,
             transformacoes=transformacoes,
             confiabilidade_score=ingestao.confiabilidade_score,
-            data_ingestao=ingestao.data_ingestao
+            data_ingestao=ingestao.data_ingestao,
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -552,13 +583,11 @@ async def get_linhagem(
 
 @router.get("/{id}/lgpd-report", response_model=LGPDReportResponse, summary="Get LGPD Report")
 async def get_lgpd_report(
-    id: UUID,
-    session: AsyncSession = Depends(get_session),
-    user: dict = Depends(get_current_user)
+    id: UUID, session: AsyncSession = Depends(get_session), user: dict = Depends(get_current_user)
 ):
     """
     Get LGPD compliance report for ingestion.
-    
+
     Returns PII detection results, consent status, compliance score.
     """
     try:
@@ -566,68 +595,71 @@ async def get_lgpd_report(
         ingestao_repo = IngestaoRepository(session)
         tenant_id = user.get("tenant_id", "nacional")
         ingestao = await ingestao_repo.get_by_id(id, tenant_id=tenant_id)
-        
+
         if not ingestao:
             raise HTTPException(status_code=404, detail="Ingestion not found")
-        
+
         # Count PII types and build details
         pii_types_detected = {}
         pii_details = []
         total_pii_instances = 0
-        
+
         # Define all expected PII types for comprehensive reporting
         all_pii_types = [
-            "cpf", "cnpj", "rg", "pis", "email", "phone",
-            "birthdate", "address", "biometric", "person", "location", "organization"
+            "cpf",
+            "cnpj",
+            "rg",
+            "pis",
+            "email",
+            "phone",
+            "birthdate",
+            "address",
+            "biometric",
+            "person",
+            "location",
+            "organization",
         ]
-        
+
         if ingestao.pii_detectado:
             for pii_type, entities in ingestao.pii_detectado.items():
                 if entities and isinstance(entities, list):
                     count = len(entities)
                     pii_types_detected[pii_type] = count
                     total_pii_instances += count
-                    
+
                     # Create masked samples (first 3)
                     samples = []
                     for entity in entities[:3]:
-                        if isinstance(entity, dict) and 'value' in entity:
-                            value = str(entity['value'])
+                        if isinstance(entity, dict) and "value" in entity:
+                            value = str(entity["value"])
                             # Mask value
                             if len(value) > 6:
-                                masked = value[:3] + '*' * (len(value) - 6) + value[-3:]
+                                masked = value[:3] + "*" * (len(value) - 6) + value[-3:]
                             else:
-                                masked = '*' * len(value)
+                                masked = "*" * len(value)
                             samples.append(masked)
                         elif isinstance(entity, str):
                             if len(entity) > 6:
-                                masked = entity[:3] + '*' * (len(entity) - 6) + entity[-3:]
+                                masked = entity[:3] + "*" * (len(entity) - 6) + entity[-3:]
                             else:
-                                masked = '*' * len(entity)
+                                masked = "*" * len(entity)
                             samples.append(masked)
-                    
-                    pii_details.append({
-                        "type": pii_type,
-                        "count": count,
-                        "samples": samples,
-                        "detected": True
-                    })
-        
+
+                    pii_details.append(
+                        {"type": pii_type, "count": count, "samples": samples, "detected": True}
+                    )
+
         # Add explicit information for PII types NOT detected
         for pii_type in all_pii_types:
             if pii_type not in pii_types_detected:
-                pii_details.append({
-                    "type": pii_type,
-                    "count": 0,
-                    "samples": [],
-                    "detected": False
-                })
-        
+                pii_details.append({"type": pii_type, "count": 0, "samples": [], "detected": False})
+
         # Get consent details
         consent_status = "missing"
         consent_records = []
-        
+
         if ingestao.consentimento_id:
+            # Instantiate consent repository without audit logger to keep tests compatible
             consent_repo = ConsentimentoRepository(session)
             consent = await consent_repo.get_by_id(ingestao.consentimento_id, tenant_id=tenant_id)
             if consent:
@@ -635,19 +667,21 @@ async def get_lgpd_report(
                     consent_status = "granted"
                 else:
                     consent_status = "revoked"
-                
+
                 # Build consent record
                 # Note: Consent model has 'finalidade' (purpose), not 'tipo'
                 # Using origem_coleta as type proxy
                 tipo_consentimento = consent.origem_coleta or "sistema"
-                consent_records.append({
-                    "tipo_consentimento": tipo_consentimento,
-                    "finalidade": consent.finalidade,
-                    "status": "válido" if consent.is_valido() else "revogado",
-                    "data_consentimento": consent.data_consentimento,
-                    "data_revogacao": consent.data_revogacao
-                })
-        
+                consent_records.append(
+                    {
+                        "tipo_consentimento": tipo_consentimento,
+                        "finalidade": consent.finalidade,
+                        "status": "válido" if consent.is_valido() else "revogado",
+                        "data_consentimento": consent.data_consentimento,
+                        "data_revogacao": consent.data_revogacao,
+                    }
+                )
+
         # Determine risk level
         risk_level = "BAIXO"
         if ingestao.confiabilidade_score < 40:
@@ -656,20 +690,26 @@ async def get_lgpd_report(
             risk_level = "ALTO"
         elif ingestao.confiabilidade_score < 80:
             risk_level = "MÉDIO"
-        
+
         # Generate recommendations
         recommendations = []
         if not ingestao.consentimento_id:
-            recommendations.append("Obter consentimento do titular antes do processamento (LGPD Art. 7º)")
+            recommendations.append(
+                "Obter consentimento do titular antes do processamento (LGPD Art. 7º)"
+            )
         if ingestao.confiabilidade_score < 50:
             recommendations.append("Score de conformidade baixo. Revisar processos de LGPD.")
         if pii_types_detected.get("cpf", 0) > 0 or pii_types_detected.get("cnpj", 0) > 0:
-            recommendations.append("Dados sensíveis detectados. Aplicar criptografia adicional (LGPD Art. 46º)")
+            recommendations.append(
+                "Dados sensíveis detectados. Aplicar criptografia adicional (LGPD Art. 46º)"
+            )
         if not ingestao.acoes_lgpd:
             recommendations.append("Nenhuma ação LGPD registrada. Verificar processamento.")
         if total_pii_instances > 100:
-            recommendations.append("Alto volume de dados pessoais detectados. Considerar minimização de dados.")
-        
+            recommendations.append(
+                "Alto volume de dados pessoais detectados. Considerar minimização de dados."
+            )
+
         # Determine applicable LGPD articles
         lgpd_articles = []
         if total_pii_instances > 0:
@@ -681,7 +721,7 @@ async def get_lgpd_report(
             lgpd_articles.append("Art. 8º - Consentimento")
         if ingestao.acoes_lgpd:
             lgpd_articles.append("Art. 46º - Segurança")
-        
+
         # Generate data analysis
         if total_pii_instances == 0:
             data_analysis = "Nenhuma instância de dados pessoais foi detectada nesta ingestão. "
@@ -689,31 +729,46 @@ async def get_lgpd_report(
             data_analysis += ", ".join(all_pii_types) + ". "
             data_analysis += "Nenhum deles foi encontrado no conteúdo analisado."
         else:
-            data_analysis = f"A ingestão contém {total_pii_instances} instâncias de dados pessoais distribuídas em {len(pii_types_detected)} tipos diferentes. "
+            data_analysis = (
+                f"A ingestão contém {total_pii_instances} instâncias de dados pessoais "
+                f"distribuídas em {len(pii_types_detected)} tipos diferentes. "
+            )
             detected_types = [pii["type"] for pii in pii_details if pii["detected"]]
             not_detected_types = [pii["type"] for pii in pii_details if not pii["detected"]]
-            
+
             if detected_types:
                 data_analysis += f"Tipos detectados: {', '.join(detected_types)}. "
             if not_detected_types:
-                data_analysis += f"Tipos verificados mas não detectados: {', '.join(not_detected_types)}. "
-        
+                data_analysis += (
+                    f"Tipos verificados mas não detectados: {', '.join(not_detected_types)}. "
+                )
+
         if consent_status == "granted":
             data_analysis += "O titular forneceu consentimento válido para o processamento. "
         elif consent_status == "missing":
             data_analysis += "ATENÇÃO: Não há consentimento registrado para esta ingestão. "
         else:
             data_analysis += "ATENÇÃO: O consentimento foi revogado. "
-        
-        data_analysis += f"O score de conformidade é {ingestao.confiabilidade_score}%, indicando nível de risco {risk_level}. "
-        
+
+        data_analysis += (
+            f"O score de conformidade é {ingestao.confiabilidade_score}% "
+            f"indicando nível de risco {risk_level}. "
+        )
+
         if ingestao.acoes_lgpd:
-            data_analysis += f"{len(ingestao.acoes_lgpd)} ações de proteção LGPD foram aplicadas durante o processamento."
+            data_analysis += (
+                f"{len(ingestao.acoes_lgpd)} ações de proteção LGPD "
+                f"foram aplicadas durante o processamento."
+            )
         else:
             data_analysis += "Nenhuma ação de proteção LGPD foi registrada."
-        
-        logger.info("lgpd_report_generated", ingestao_id=str(id), compliance_score=ingestao.confiabilidade_score)
-        
+
+        logger.info(
+            "lgpd_report_generated",
+            ingestao_id=str(id),
+            compliance_score=ingestao.confiabilidade_score,
+        )
+
         return LGPDReportResponse(
             ingestao_id=ingestao.id,
             pii_types_detected=pii_types_detected,
@@ -728,9 +783,9 @@ async def get_lgpd_report(
             recommendations=recommendations,
             lgpd_articles_applicable=lgpd_articles,
             data_analysis=data_analysis,
-            data_processamento=ingestao.data_processamento
+            data_processamento=ingestao.data_processamento,
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -767,37 +822,46 @@ async def get_presigned_download_url(
         logger.error("presigned_url_failed", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to generate presigned URL")
 
+
 @router.get("/{id}/pii", summary="Get PII Details")
 async def get_pii_details(
-    id: UUID,
-    session: AsyncSession = Depends(get_session),
-    user: dict = Depends(get_current_user)
+    id: UUID, session: AsyncSession = Depends(get_session), user: dict = Depends(get_current_user)
 ):
     """
     Get detailed PII data detected in ingestion.
     Returns masked samples for privacy.
     """
     try:
-        ingestao_repo = IngestaoRepository(session)
+        ingestao_repo = IngestaoRepository(session, audit_logger=get_audit_logger())
         tenant_id = user.get("tenant_id", "nacional")
         ingestao = await ingestao_repo.get_by_id(id, tenant_id=tenant_id)
-        
+
         if not ingestao:
             raise HTTPException(status_code=404, detail="Ingestion not found")
-        
+
         # Define all expected PII types
         all_pii_types = [
-            "cpf", "cnpj", "rg", "pis", "email", "phone",
-            "birthdate", "address", "biometric", "person", "location", "organization"
+            "cpf",
+            "cnpj",
+            "rg",
+            "pis",
+            "email",
+            "phone",
+            "birthdate",
+            "address",
+            "biometric",
+            "person",
+            "location",
+            "organization",
         ]
-        
+
         # Count PII types
         por_tipo = {}
         detalhes = []
         total_pii_encontrados = 0
         pii_tipos_detectados = []
         pii_tipos_nao_detectados = []
-        
+
         if ingestao.pii_detectado:
             for pii_type, entities in ingestao.pii_detectado.items():
                 if entities and isinstance(entities, list):
@@ -805,65 +869,73 @@ async def get_pii_details(
                     por_tipo[pii_type] = count
                     total_pii_encontrados += count
                     pii_tipos_detectados.append(pii_type)
-                    
+
                     # Create masked samples (first 5)
                     exemplos_mascarados = []
                     for entity in entities[:5]:
                         if isinstance(entity, dict):
-                            campo = entity.get('campo', 'unknown')
-                            value = str(entity.get('value', ''))
+                            value = str(entity.get("value", ""))
                         elif isinstance(entity, str):
-                            campo = pii_type
                             value = entity
                         else:
                             continue
-                        
+
                         # Mask value
                         if len(value) > 6:
-                            masked = value[:3] + '*' * (len(value) - 6) + value[-3:]
+                            masked = value[:3] + "*" * (len(value) - 6) + value[-3:]
                         else:
-                            masked = '*' * len(value)
+                            masked = "*" * len(value)
                         exemplos_mascarados.append(masked)
-                    
+
                     # Determine sensitivity level
-                    nivel_sensibilidade = 'medio'
-                    if pii_type in ['cpf', 'cnpj', 'rg', 'pis', 'biometric', 'birthdate']:
-                        nivel_sensibilidade = 'alto'
-                    elif pii_type in ['nome', 'email', 'telefone', 'address']:
-                        nivel_sensibilidade = 'baixo'
-                    
-                    detalhes.append({
-                        "campo": pii_type,
-                        "tipo_pii": pii_type.upper(),
-                        "ocorrencias": count,
-                        "exemplos_mascarados": exemplos_mascarados,
-                        "nivel_sensibilidade": nivel_sensibilidade,
-                        "detectado": True
-                    })
-        
+                    nivel_sensibilidade = "medio"
+                    if pii_type in ["cpf", "cnpj", "rg", "pis", "biometric", "birthdate"]:
+                        nivel_sensibilidade = "alto"
+                    elif pii_type in ["nome", "email", "telefone", "address"]:
+                        nivel_sensibilidade = "baixo"
+
+                    detalhes.append(
+                        {
+                            "campo": pii_type,
+                            "tipo_pii": pii_type.upper(),
+                            "ocorrencias": count,
+                            "exemplos_mascarados": exemplos_mascarados,
+                            "nivel_sensibilidade": nivel_sensibilidade,
+                            "detectado": True,
+                        }
+                    )
+
         # Add explicit information for types NOT detected
         for pii_type in all_pii_types:
             if pii_type not in pii_tipos_detectados:
                 pii_tipos_nao_detectados.append(pii_type)
-                
+
                 # Determine sensitivity level
-                nivel_sensibilidade = 'medio'
-                if pii_type in ['cpf', 'cnpj', 'rg', 'pis', 'biometric', 'birthdate']:
-                    nivel_sensibilidade = 'alto'
-                elif pii_type in ['nome', 'email', 'telefone', 'address']:
-                    nivel_sensibilidade = 'baixo'
-                
-                detalhes.append({
-                    "campo": pii_type,
-                    "tipo_pii": pii_type.upper(),
-                    "ocorrencias": 0,
-                    "exemplos_mascarados": [],
-                    "nivel_sensibilidade": nivel_sensibilidade,
-                    "detectado": False
-                })
-        
-        logger.info("pii_details_retrieved", ingestao_id=str(id), total_pii=total_pii_encontrados, detected_types=len(pii_tipos_detectados), not_detected_types=len(pii_tipos_nao_detectados))
-        
+                nivel_sensibilidade = "medio"
+                if pii_type in ["cpf", "cnpj", "rg", "pis", "biometric", "birthdate"]:
+                    nivel_sensibilidade = "alto"
+                elif pii_type in ["nome", "email", "telefone", "address"]:
+                    nivel_sensibilidade = "baixo"
+
+                detalhes.append(
+                    {
+                        "campo": pii_type,
+                        "tipo_pii": pii_type.upper(),
+                        "ocorrencias": 0,
+                        "exemplos_mascarados": [],
+                        "nivel_sensibilidade": nivel_sensibilidade,
+                        "detectado": False,
+                    }
+                )
+
+        logger.info(
+            "pii_details_retrieved",
+            ingestao_id=str(id),
+            total_pii=total_pii_encontrados,
+            detected_types=len(pii_tipos_detectados),
+            not_detected_types=len(pii_tipos_nao_detectados),
+        )
+
         return {
             "total_pii_encontrados": total_pii_encontrados,
             "tipos_verificados": len(all_pii_types),
@@ -872,9 +944,9 @@ async def get_pii_details(
             "pii_tipos_detectados": pii_tipos_detectados,
             "pii_tipos_nao_detectados": pii_tipos_nao_detectados,
             "por_tipo": por_tipo,
-            "detalhes": detalhes
+            "detalhes": detalhes,
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:

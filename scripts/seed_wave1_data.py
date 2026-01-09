@@ -187,7 +187,7 @@ async def seed_consentimentos(session: AsyncSession) -> list[Consentimento]:
             categorias_dados=dados["categorias_dados"],
             base_legal=dados["base_legal"],
             consentimento_dado=dados["consentimento_dado"],
-            data_consentimento=(datetime.utcnow() - timedelta(days=30 - idx)),
+            data_consentimento=(datetime.now(datetime.UTC) - timedelta(days=30 - idx)),
             versao=1,
             coletado_por=USER_UUID,
         )
@@ -267,7 +267,7 @@ async def seed_ingestoes(session: AsyncSession, consentimentos: list[Consentimen
             metodo=dados["metodo"],
             confiabilidade_score=dados["confiabilidade_score"],
             status=dados["status"],
-            data_ingestao=(datetime.utcnow() - timedelta(days=10 - idx)),
+            data_ingestao=(datetime.now(datetime.UTC) - timedelta(days=10 - idx)),
             criado_por=USER_UUID,
             arquivo_original=arquivo_original,
             arquivo_storage_path=arquivo_storage_path,

@@ -1,8 +1,9 @@
-from typing import Any, Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _serialize_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -34,7 +35,9 @@ class ModelFieldConfigRepository:
         rows = result.mappings().all()
         return [_serialize_row(dict(row)) for row in rows]
 
-    async def get_one(self, session: AsyncSession, model_name: str, field_name: str) -> Optional[Dict[str, Any]]:
+    async def get_one(
+        self, session: AsyncSession, model_name: str, field_name: str
+    ) -> Optional[Dict[str, Any]]:
         query = text(
             """
             SELECT id, model_name, field_name, field_type, label_key, validators,
@@ -56,7 +59,14 @@ class ModelFieldConfigRepository:
         updates: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
         # Build dynamic SET clause
-        allowed = {"label_key", "validators", "visibility_rule", "required", "default_value", "description"}
+        allowed = {
+            "label_key",
+            "validators",
+            "visibility_rule",
+            "required",
+            "default_value",
+            "description",
+        }
         set_parts = []
         params: Dict[str, Any] = {"model_name": model_name, "field_name": field_name}
         for key, value in updates.items():

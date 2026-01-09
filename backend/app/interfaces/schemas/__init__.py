@@ -4,52 +4,52 @@ This module contains all Pydantic schemas for request/response validation.
 Schemas follow Pydantic v2 conventions with proper validation and documentation.
 """
 
-from app.interfaces.schemas.funding_sources import (
-    FundingSourceCreate,
-    FundingSourceUpdate,
-    FundingSourceResponse,
-    FundingSourceListItem,
-    FundingSourceListResponse,
-    FundingSourceHistoryResponse,
-)
 from app.interfaces.schemas.clients import (
     ClientCreate,
-    ClientUpdate,
-    ClientResponse,
+    ClientHistoryResponse,
     ClientListItem,
     ClientListResponse,
-    ClientHistoryResponse,
+    ClientResponse,
+    ClientUpdate,
+)
+from app.interfaces.schemas.funding_sources import (
+    FundingSourceCreate,
+    FundingSourceHistoryResponse,
+    FundingSourceListItem,
+    FundingSourceListResponse,
+    FundingSourceResponse,
+    FundingSourceUpdate,
 )
 from app.interfaces.schemas.interactions import (
     InteractionCreate,
-    InteractionUpdate,
-    InteractionResponse,
     InteractionListItem,
     InteractionListResponse,
+    InteractionResponse,
+    InteractionUpdate,
 )
 from app.interfaces.schemas.opportunities import (
     OpportunityCreate,
-    OpportunityUpdate,
-    OpportunityStageTransition,
-    OpportunityResponse,
     OpportunityListItem,
     OpportunityListResponse,
+    OpportunityResponse,
+    OpportunityStageTransition,
     OpportunityTransitionsResponse,
+    OpportunityUpdate,
 )
 from app.interfaces.schemas.portfolio import (
+    CompetenceCreate,
+    CompetenceListResponse,
+    CompetenceResponse,
     InstituteCreate,
-    InstituteUpdate,
-    InstituteResponse,
     InstituteListItem,
     InstituteListResponse,
+    InstituteResponse,
+    InstituteUpdate,
     ProjectCreate,
-    ProjectUpdate,
-    ProjectResponse,
     ProjectListItem,
     ProjectListResponse,
-    CompetenceCreate,
-    CompetenceResponse,
-    CompetenceListResponse,
+    ProjectResponse,
+    ProjectUpdate,
 )
 
 __all__ = [

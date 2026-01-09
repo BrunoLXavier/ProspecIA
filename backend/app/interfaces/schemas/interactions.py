@@ -1,15 +1,17 @@
 """Pydantic schemas for Interactions API (RF-04 CRM)."""
+
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.interaction import InteractionType, InteractionOutcome, InteractionStatus
+from app.domain.interaction import InteractionOutcome, InteractionStatus, InteractionType
 
 
 class InteractionCreate(BaseModel):
     """Schema for creating an interaction."""
+
     client_id: UUID = Field(..., description="Client UUID")
     title: str = Field(..., min_length=1, max_length=255, description="Interaction title")
     description: str = Field(..., min_length=1, description="Detailed description")
@@ -19,22 +21,25 @@ class InteractionCreate(BaseModel):
     outcome: Optional[InteractionOutcome] = Field(None, description="Outcome of the interaction")
     next_steps: Optional[str] = Field(None, description="Next steps to take")
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "client_id": "123e4567-e89b-12d3-a456-426614174000",
-            "title": "Reunião Comercial - Apresentação de Projeto",
-            "description": "Apresentação detalhada do projeto de P&D para o diretor técnico",
-            "type": "meeting",
-            "date": "2024-01-15T14:30:00Z",
-            "participants": ["João Silva", "Maria Santos"],
-            "outcome": "positive",
-            "next_steps": "Enviar proposta técnica detalhada até dia 20/01"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "client_id": "123e4567-e89b-12d3-a456-426614174000",
+                "title": "Reunião Comercial - Apresentação de Projeto",
+                "description": "Apresentação detalhada do projeto de P&D para o diretor técnico",
+                "type": "meeting",
+                "date": "2024-01-15T14:30:00Z",
+                "participants": ["João Silva", "Maria Santos"],
+                "outcome": "positive",
+                "next_steps": "Enviar proposta técnica detalhada até dia 20/01",
+            }
         }
-    })
+    )
 
 
 class InteractionUpdate(BaseModel):
     """Schema for updating an interaction."""
+
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, min_length=1)
     type: Optional[InteractionType] = None
@@ -44,16 +49,19 @@ class InteractionUpdate(BaseModel):
     next_steps: Optional[str] = None
     status: Optional[InteractionStatus] = None
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "outcome": "positive",
-            "next_steps": "Agendar reunião técnica para próxima semana"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "outcome": "positive",
+                "next_steps": "Agendar reunião técnica para próxima semana",
+            }
         }
-    })
+    )
 
 
 class InteractionResponse(BaseModel):
     """Schema for interaction response."""
+
     id: UUID
     client_id: UUID
     title: str
@@ -73,6 +81,7 @@ class InteractionResponse(BaseModel):
 
 class InteractionListItem(BaseModel):
     """Schema for interaction list item."""
+
     id: UUID
     client_id: UUID
     title: str
@@ -86,6 +95,7 @@ class InteractionListItem(BaseModel):
 
 class InteractionListResponse(BaseModel):
     """Schema for paginated interaction list."""
+
     items: List[InteractionListItem]
     total: int
     skip: int

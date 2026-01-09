@@ -56,6 +56,9 @@ export default function AdminPage() {
           </Link>
         ))}
       </div>
+        <div className="mt-8">
+          <Link href="/" className="btn-primary">← {t('dashboard.back_home')}</Link>
+        </div>
     </div>
   )
 }

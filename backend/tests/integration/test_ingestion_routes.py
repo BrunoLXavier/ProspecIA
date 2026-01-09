@@ -5,8 +5,8 @@ import pytest
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 
-from app.interfaces.http.routers import ingestao as ingestao_router
-from app.domain.models.ingestao import Ingestao, IngestionSource, IngestionMethod, IngestionStatus
+from app.interfaces.http.routers import ingestion as ingestion_router
+from app.domain.models.ingestion import Ingestao, IngestionSource, IngestionMethod, IngestionStatus
 
 
 class FakeSession:
@@ -98,12 +98,12 @@ def app(monkeypatch):
     from starlette.middleware.base import BaseHTTPMiddleware
     from fastapi import Request
     
-    monkeypatch.setattr(ingestao_router, "IngestaoRepository", FakeIngestaoRepository)
-    monkeypatch.setattr(ingestao_router, "ConsentimentoRepository", FakeConsentimentoRepository)
-    monkeypatch.setattr(ingestao_router, "get_lgpd_agent", fake_get_lgpd_agent)
-    monkeypatch.setattr(ingestao_router, "get_minio_client", fake_get_minio_client)
-    monkeypatch.setattr(ingestao_router, "get_neo4j_connection", fake_neo4j_conn)
-    monkeypatch.setattr(ingestao_router, "require_roles", fake_require_roles)
+    monkeypatch.setattr(ingestion_router, "IngestaoRepository", FakeIngestaoRepository)
+    monkeypatch.setattr(ingestion_router, "ConsentimentoRepository", FakeConsentimentoRepository)
+    monkeypatch.setattr(ingestion_router, "get_lgpd_agent", fake_get_lgpd_agent)
+    monkeypatch.setattr(ingestion_router, "get_minio_client", fake_get_minio_client)
+    monkeypatch.setattr(ingestion_router, "get_neo4j_connection", fake_neo4j_conn)
+    monkeypatch.setattr(ingestion_router, "require_roles", fake_require_roles)
 
     # Middleware to inject mock user into request state
     class MockAuthMiddleware(BaseHTTPMiddleware):
@@ -113,8 +113,8 @@ def app(monkeypatch):
 
     fastapi_app = FastAPI()
     fastapi_app.add_middleware(MockAuthMiddleware)
-    fastapi_app.dependency_overrides[ingestao_router.get_session] = lambda: fake_get_session()
-    fastapi_app.include_router(ingestao_router.router)
+    fastapi_app.dependency_overrides[ingestion_router.get_session] = lambda: fake_get_session()
+    fastapi_app.include_router(ingestion_router.router)
     return fastapi_app
 
 

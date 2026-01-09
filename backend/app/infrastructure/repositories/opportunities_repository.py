@@ -1,13 +1,14 @@
 """Repository for opportunities management (RF-05 Pipeline)."""
-from datetime import datetime
-from typing import Any, Dict, Optional, Sequence
+
 import inspect
+from datetime import UTC, datetime
+from typing import Any, Dict, Optional, Sequence
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.opportunity import Opportunity, OpportunityStage, OpportunityStatus
+from app.infrastructure.models.opportunity import Opportunity, OpportunityStage, OpportunityStatus
 
 
 class OpportunitiesRepository:
@@ -140,7 +141,7 @@ class OpportunitiesRepository:
             return None
 
         history_entry: Dict[str, Any] = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "usuario_id": str(updated_by),
             "acao": "atualizacao",
             "campos": updates,
@@ -157,7 +158,7 @@ class OpportunitiesRepository:
                 setattr(existing, field, value)
 
         existing.atualizado_por = updated_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
@@ -216,7 +217,11 @@ class OpportunitiesRepository:
             entity_id=str(opportunity_id),
             tenant_id=str(tenant_id),
             user_id=str(updated_by),
-            data={"from_stage": existing.historico_transicoes[-1]["from_stage"], "to_stage": new_stage.value, "motivo": motivo},
+            data={
+                "from_stage": existing.historico_transicoes[-1]["from_stage"],
+                "to_stage": new_stage.value,
+                "motivo": motivo,
+            },
         )
 
         return existing
@@ -235,7 +240,7 @@ class OpportunitiesRepository:
             return False
 
         history_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "usuario_id": str(deleted_by),
             "acao": "exclusao",
             "campos": {"status": OpportunityStatus.EXCLUDED.value},
@@ -248,7 +253,7 @@ class OpportunitiesRepository:
 
         existing.status = OpportunityStatus.EXCLUDED
         existing.atualizado_por = deleted_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):

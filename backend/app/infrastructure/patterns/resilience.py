@@ -1,10 +1,20 @@
 from __future__ import annotations
 
-import time
 import random
-from typing import Callable, TypeVar, Iterable, Awaitable, Optional
+import time
+from typing import (
+    Awaitable,
+    Callable,
+    Iterable,
+    Optional,
+    TypeVar,
+)
 
 T = TypeVar("T")
+CallableT = Callable[..., T]
+CallableAwaitableT = Callable[..., Awaitable[T]]
+RetryDecorator = Callable[[CallableT], CallableT]
+RetryAsyncDecorator = Callable[[CallableAwaitableT], CallableAwaitableT]
 
 
 class CircuitBreaker:
@@ -16,7 +26,11 @@ class CircuitBreaker:
     - half-open allows a single trial; success closes, failure re-opens
     """
 
-    def __init__(self, failure_threshold: int = 5, reset_timeout_sec: int = 30):
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        reset_timeout_sec: int = 30,
+    ):
         self.failure_threshold = max(1, failure_threshold)
         self.reset_timeout_sec = max(1, reset_timeout_sec)
         self._consecutive_failures = 0
@@ -27,7 +41,11 @@ class CircuitBreaker:
         if self._state == "closed":
             return True
         now = time.time()
-        if self._state == "open" and self._open_until and now >= self._open_until:
+        if (
+            self._state == "open"
+            and self._open_until
+            and now >= self._open_until
+        ):
             # Move to half-open for a trial
             self._state = "half-open"
             return True
@@ -45,7 +63,12 @@ class CircuitBreaker:
             self._open_until = time.time() + self.reset_timeout_sec
 
 
-def _compute_backoff(base: float, factor: float, attempt: int, jitter: float) -> float:
+def _compute_backoff(
+    base: float,
+    factor: float,
+    attempt: int,
+    jitter: float,
+) -> float:
     delay = base * (factor ** max(0, attempt - 1))
     if jitter > 0:
         delay += random.uniform(0, jitter)
@@ -58,7 +81,7 @@ def retry(
     base_delay: float = 0.2,
     factor: float = 2.0,
     jitter: float = 0.1,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> RetryDecorator:
     """Synchronous retry decorator with exponential backoff and jitter."""
 
     def decorator(fn: Callable[..., T]) -> Callable[..., T]:
@@ -67,11 +90,14 @@ def retry(
             while True:
                 try:
                     return fn(*args, **kwargs)
-                except exceptions as e:  # type: ignore
+                except exceptions:  # type: ignore
                     if attempt >= max_attempts:
                         raise
-                    time.sleep(_compute_backoff(base_delay, factor, attempt, jitter))
+                    time.sleep(
+                        _compute_backoff(base_delay, factor, attempt, jitter)
+                    )
                     attempt += 1
+
         return wrapper
 
     return decorator
@@ -83,21 +109,24 @@ def async_retry(
     base_delay: float = 0.2,
     factor: float = 2.0,
     jitter: float = 0.1,
-) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
+) -> RetryAsyncDecorator:
     """Async retry decorator with exponential backoff and jitter."""
     import asyncio
 
-    def decorator(fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    def decorator(fn: CallableAwaitableT) -> CallableAwaitableT:
         async def wrapper(*args, **kwargs) -> T:
             attempt = 1
             while True:
                 try:
                     return await fn(*args, **kwargs)
-                except exceptions as e:  # type: ignore
+                except exceptions:  # type: ignore
                     if attempt >= max_attempts:
                         raise
-                    await asyncio.sleep(_compute_backoff(base_delay, factor, attempt, jitter))
+                    await asyncio.sleep(
+                        _compute_backoff(base_delay, factor, attempt, jitter)
+                    )
                     attempt += 1
+
         return wrapper
 
     return decorator

@@ -1,15 +1,16 @@
 """Repository for portfolio management (RF-03)."""
-from datetime import datetime
+
+import inspect
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Dict, Optional, Sequence
 from uuid import UUID
-import inspect
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.portfolio import Institute, Project, Competence, InstituteStatus, ProjectStatus
 from app.adapters.kafka.producer import KafkaProducer
+from app.domain.portfolio import Competence, Institute, InstituteStatus, Project, ProjectStatus
 
 
 class InstitutesRepository:
@@ -48,7 +49,9 @@ class InstitutesRepository:
         include_excluded: bool = False,
     ) -> Optional[Institute]:
         """Get institute by ID with soft-delete awareness."""
-        stmt = select(Institute).where(Institute.id == institute_id, Institute.tenant_id == tenant_id)
+        stmt = select(Institute).where(
+            Institute.id == institute_id, Institute.tenant_id == tenant_id
+        )
         if not include_excluded:
             stmt = stmt.where(Institute.status != InstituteStatus.EXCLUDED)
         result = await self.session.execute(stmt)
@@ -66,12 +69,19 @@ class InstitutesRepository:
         limit: int = 100,
     ) -> tuple[Sequence[Institute], int]:
         """List institutes with filters and pagination."""
-        base_query = select(Institute).where(Institute.tenant_id == tenant_id, Institute.status != InstituteStatus.EXCLUDED)
+        base_query = select(Institute).where(
+            Institute.tenant_id == tenant_id, Institute.status != InstituteStatus.EXCLUDED
+        )
         if status:
             base_query = base_query.where(Institute.status == status)
         if search:
             search_pattern = f"%{search}%"
-            base_query = base_query.where(or_(Institute.name.ilike(search_pattern), Institute.description.ilike(search_pattern)))
+            base_query = base_query.where(
+                or_(
+                    Institute.name.ilike(search_pattern),
+                    Institute.description.ilike(search_pattern),
+                )
+            )
 
         query = base_query.order_by(Institute.name).offset(skip).limit(limit)
         result = await self.session.execute(query)
@@ -119,7 +129,7 @@ class InstitutesRepository:
                     "valor_anterior": old_value,
                     "valor_novo": new_value,
                     "atualizado_por": str(updated_by),
-                    "atualizado_em": datetime.utcnow().isoformat(),
+                    "atualizado_em": datetime.now(UTC).isoformat(),
                 }
                 if motivo:
                     entry["motivo"] = motivo
@@ -130,7 +140,7 @@ class InstitutesRepository:
             if hasattr(existing, k):
                 setattr(existing, k, v)
         existing.atualizado_por = updated_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
@@ -164,18 +174,20 @@ class InstitutesRepository:
         if not existing:
             return False
         historico = list(existing.historico_atualizacoes or [])
-        historico.append({
-            "campo": "status",
-            "valor_anterior": existing.status.value,
-            "valor_novo": InstituteStatus.EXCLUDED.value,
-            "atualizado_por": str(deleted_by),
-            "atualizado_em": datetime.utcnow().isoformat(),
-            "motivo": motivo,
-        })
+        historico.append(
+            {
+                "campo": "status",
+                "valor_anterior": existing.status.value,
+                "valor_novo": InstituteStatus.EXCLUDED.value,
+                "atualizado_por": str(deleted_by),
+                "atualizado_em": datetime.now(UTC).isoformat(),
+                "motivo": motivo,
+            }
+        )
         existing.historico_atualizacoes = historico
         existing.status = InstituteStatus.EXCLUDED
         existing.atualizado_por = deleted_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
             await add_result
@@ -218,7 +230,11 @@ class ProjectsRepository:
             entity_id=str(project.id),
             tenant_id=str(project.tenant_id),
             user_id=str(project.criado_por),
-            data={"title": project.title, "institute_id": str(project.institute_id), "trl": project.trl},
+            data={
+                "title": project.title,
+                "institute_id": str(project.institute_id),
+                "trl": project.trl,
+            },
         )
         return project
 
@@ -249,7 +265,9 @@ class ProjectsRepository:
         limit: int = 100,
     ) -> tuple[Sequence[Project], int]:
         """List projects with filters and pagination."""
-        base_query = select(Project).where(Project.tenant_id == tenant_id, Project.status != ProjectStatus.EXCLUDED)
+        base_query = select(Project).where(
+            Project.tenant_id == tenant_id, Project.status != ProjectStatus.EXCLUDED
+        )
         if status:
             base_query = base_query.where(Project.status == status)
         if institute_id:
@@ -305,7 +323,7 @@ class ProjectsRepository:
                     "valor_anterior": old_value,
                     "valor_novo": new_value,
                     "atualizado_por": str(updated_by),
-                    "atualizado_em": datetime.utcnow().isoformat(),
+                    "atualizado_em": datetime.now(UTC).isoformat(),
                 }
                 if motivo:
                     entry["motivo"] = motivo
@@ -316,7 +334,7 @@ class ProjectsRepository:
             if hasattr(existing, k):
                 setattr(existing, k, v)
         existing.atualizado_por = updated_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
 
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
@@ -350,18 +368,20 @@ class ProjectsRepository:
         if not existing:
             return False
         historico = list(existing.historico_atualizacoes or [])
-        historico.append({
-            "campo": "status",
-            "valor_anterior": existing.status.value,
-            "valor_novo": ProjectStatus.EXCLUDED.value,
-            "atualizado_por": str(deleted_by),
-            "atualizado_em": datetime.utcnow().isoformat(),
-            "motivo": motivo,
-        })
+        historico.append(
+            {
+                "campo": "status",
+                "valor_anterior": existing.status.value,
+                "valor_novo": ProjectStatus.EXCLUDED.value,
+                "atualizado_por": str(deleted_by),
+                "atualizado_em": datetime.now(UTC).isoformat(),
+                "motivo": motivo,
+            }
+        )
         existing.historico_atualizacoes = historico
         existing.status = ProjectStatus.EXCLUDED
         existing.atualizado_por = deleted_by
-        existing.atualizado_em = datetime.utcnow()
+        existing.atualizado_em = datetime.now(UTC)
         add_result = self.session.add(existing)
         if inspect.isawaitable(add_result):
             await add_result
@@ -414,7 +434,9 @@ class CompetencesRepository:
         tenant_id: UUID,
     ) -> Optional[Competence]:
         """Get competence by ID with RLS."""
-        stmt = select(Competence).where(Competence.id == competence_id, Competence.tenant_id == tenant_id)
+        stmt = select(Competence).where(
+            Competence.id == competence_id, Competence.tenant_id == tenant_id
+        )
         result = await self.session.execute(stmt)
         value = result.scalar_one_or_none()
         if inspect.isawaitable(value):
@@ -466,7 +488,7 @@ class CompetencesRepository:
         commit_result = self.session.commit()
         if inspect.isawaitable(commit_result):
             await commit_result
-        
+
         await self.kafka_producer.send_event(
             topic="competences",
             event_type="competence_deleted",

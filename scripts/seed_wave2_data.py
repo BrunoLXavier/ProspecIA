@@ -104,7 +104,7 @@ async def seed_acl_rules(session: AsyncSession):
             action=rule["action"],
             role=rule["role"],
             allowed=rule["allowed"],
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(datetime.UTC),
         )
         await session.execute(stmt)
     
@@ -146,8 +146,8 @@ async def seed_model_configs(session: AsyncSession):
             visible=config["visible"],
             required=config["required"],
             validators=config.get("validators", {}),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(datetime.UTC),
+            updated_at=datetime.now(datetime.UTC),
         )
         await session.execute(stmt)
     
@@ -221,8 +221,8 @@ async def seed_funding_sources(repo: FundingSourcesRepository):
             historico_atualizacoes=[],
             criado_por=ADMIN_USER_ID,
             atualizado_por=ADMIN_USER_ID,
-            criado_em=datetime.utcnow(),
-            atualizado_em=datetime.utcnow(),
+            criado_em=datetime.now(datetime.UTC),
+            atualizado_em=datetime.now(datetime.UTC),
         )
         await repo.create(source)
     
@@ -275,7 +275,7 @@ async def seed_portfolio(
             historico_atualizacoes=[],
             criado_por=ADMIN_USER_ID,
             atualizado_por=ADMIN_USER_ID,
-            criado_em=datetime.utcnow(),
+            criado_em=datetime.now(datetime.UTC),
             atualizado_em=datetime.utcnow(),
         )
         created = await institutes_repo.create(institute)
@@ -434,14 +434,14 @@ async def seed_clients_interactions(
             title=f"Reunião inicial - Cliente {i+1}",
             description="Apresentação de capacidades e levantamento de necessidades",
             type=InteractionType.MEETING,
-            date=datetime.utcnow() - timedelta(days=30),
+            date=datetime.now(datetime.UTC) - timedelta(days=30),
             participants=["João Silva", "Maria Santos"],
             outcome=InteractionOutcome.POSITIVE,
             next_steps="Enviar proposta técnica até próxima semana",
             status=InteractionStatus.COMPLETED,
             tenant_id=TENANT_ID,
             criado_por=ADMIN_USER_ID,
-            criado_em=datetime.utcnow(),
+            criado_em=datetime.now(datetime.UTC),
         )
         await interactions_repo.create(interaction1)
         
@@ -452,14 +452,14 @@ async def seed_clients_interactions(
             title=f"Follow-up - Cliente {i+1}",
             description="Alinhamento técnico e discussão de próximos passos",
             type=InteractionType.EMAIL,
-            date=datetime.utcnow() - timedelta(days=15),
+            date=datetime.now(datetime.UTC) - timedelta(days=15),
             participants=["Pedro Costa"],
             outcome=InteractionOutcome.NEUTRAL if i % 3 == 0 else InteractionOutcome.POSITIVE,
             next_steps="Aguardar retorno do cliente sobre viabilidade interna",
             status=InteractionStatus.COMPLETED,
             tenant_id=TENANT_ID,
             criado_por=ADMIN_USER_ID,
-            criado_em=datetime.utcnow(),
+            criado_em=datetime.now(datetime.UTC),
         )
         await interactions_repo.create(interaction2)
     
@@ -492,7 +492,7 @@ async def seed_opportunities(
             score=50 + (i * 2),  # 50-88
             estimated_value=(i + 1) * 10000000,  # R$100k - R$2M
             probability=40 + (i % 6) * 10,  # 40-90
-            expected_close_date=datetime.utcnow() + timedelta(days=30 + (i * 10)),
+            expected_close_date=datetime.now(datetime.UTC) + timedelta(days=30 + (i * 10)),
             responsible_user_id=ADMIN_USER_ID,
             status=OpportunityStatus.ACTIVE,
             tenant_id=TENANT_ID,
@@ -500,8 +500,8 @@ async def seed_opportunities(
             historico_transicoes=[],
             criado_por=ADMIN_USER_ID,
             atualizado_por=ADMIN_USER_ID,
-            criado_em=datetime.utcnow(),
-            atualizado_em=datetime.utcnow(),
+            criado_em=datetime.now(datetime.UTC),
+            atualizado_em=datetime.now(datetime.UTC),
         )
         await repo.create(opportunity)
     

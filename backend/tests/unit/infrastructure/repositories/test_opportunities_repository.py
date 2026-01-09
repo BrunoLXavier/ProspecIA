@@ -1,5 +1,5 @@
 """Unit tests for OpportunitiesRepository."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -43,7 +43,7 @@ def sample_opportunity():
         score=75,
         estimated_value=50000000,  # R$500k em centavos
         probability=60,
-        expected_close_date=datetime.utcnow() + timedelta(days=60),
+        expected_close_date=datetime.now(UTC) + timedelta(days=60),
         responsible_user_id=UUID("00000000-0000-0000-0000-000000000123"),
         status=OpportunityStatus.ACTIVE,
         tenant_id=UUID("00000000-0000-0000-0000-000000000001"),
@@ -51,8 +51,8 @@ def sample_opportunity():
         historico_transicoes=[],
         criado_por=UUID("00000000-0000-0000-0000-000000000123"),
         atualizado_por=UUID("00000000-0000-0000-0000-000000000123"),
-        criado_em=datetime.utcnow(),
-        atualizado_em=datetime.utcnow(),
+        criado_em=datetime.now(UTC),
+        atualizado_em=datetime.now(UTC),
     )
 
 
@@ -422,14 +422,14 @@ class TestOpportunitiesRepositoryGetTransitions:
         # Arrange
         sample_opportunity.historico_transicoes = [
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "from_stage": OpportunityStage.INTELLIGENCE.value,
                 "to_stage": OpportunityStage.VALIDATION.value,
                 "usuario_id": str(uuid4()),
                 "motivo": "Dados suficientes coletados",
             },
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "from_stage": OpportunityStage.VALIDATION.value,
                 "to_stage": OpportunityStage.APPROACH.value,
                 "usuario_id": str(uuid4()),
@@ -463,13 +463,13 @@ class TestOpportunitiesRepositoryHistory:
         # Arrange
         sample_opportunity.historico_atualizacoes = [
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "usuario_id": str(uuid4()),
                 "acao": "atualizacao",
                 "campos": {"score": 70},
             },
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "usuario_id": str(uuid4()),
                 "acao": "atualizacao",
                 "campos": {"probability": 65},

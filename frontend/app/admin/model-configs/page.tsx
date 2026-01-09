@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/lib/hooks/useI18n'
+import Link from 'next/link'
 
 type FieldConfig = {
   id: string
@@ -89,7 +90,7 @@ export default function ModelConfigsPage() {
           <option>Consentimento</option>
         </select>
         <button
-          className="ml-auto border rounded-md px-3 py-1 text-sm hover:bg-gray-50"
+          className="ml-auto bg-primary-600 text-white rounded px-4 py-2 text-sm font-semibold shadow hover:bg-primary-700 transition"
           onClick={load}
         >{t('button.refresh', 'Atualizar')}</button>
       </div>
@@ -152,7 +153,7 @@ export default function ModelConfigsPage() {
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button
-                        className="border rounded px-3 py-1 text-sm hover:bg-gray-50"
+                        className="bg-primary-600 text-white rounded px-4 py-2 text-sm font-semibold shadow hover:bg-primary-700 transition"
                         onClick={() => saveRow(row)}
                       >{t('button.save')}</button>
                     </td>
@@ -163,6 +164,9 @@ export default function ModelConfigsPage() {
           </table>
         </div>
       )}
+        <div className="mt-8">
+          <Link href="/" className="btn-primary">← {t('dashboard.back_home')}</Link>
+        </div>
     </div>
   )
 }

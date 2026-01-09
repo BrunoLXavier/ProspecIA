@@ -1,4 +1,5 @@
 """REST API router for Portfolio (RF-03)."""
+
 from typing import Optional
 from uuid import UUID
 
@@ -6,26 +7,26 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from prometheus_client import Counter, Histogram
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.kafka.producer import KafkaProducer
+from app.adapters.kafka.producer import KafkaProducerAdapter, get_kafka_producer
 from app.domain.portfolio import InstituteStatus, ProjectStatus
 from app.infrastructure.database import get_async_session
 from app.infrastructure.repositories.portfolio_repository import (
+    CompetencesRepository,
     InstitutesRepository,
     ProjectsRepository,
-    CompetencesRepository,
 )
 from app.interfaces.schemas.portfolio import (
-    InstituteCreate,
-    InstituteUpdate,
-    InstituteResponse,
-    InstituteListResponse,
-    ProjectCreate,
-    ProjectUpdate,
-    ProjectResponse,
-    ProjectListResponse,
     CompetenceCreate,
-    CompetenceResponse,
     CompetenceListResponse,
+    CompetenceResponse,
+    InstituteCreate,
+    InstituteListResponse,
+    InstituteResponse,
+    InstituteUpdate,
+    ProjectCreate,
+    ProjectListResponse,
+    ProjectResponse,
+    ProjectUpdate,
 )
 
 router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
@@ -36,12 +37,14 @@ institutes_updated_total = Counter("institutes_updated_total", "Total institutes
 projects_created_total = Counter("projects_created_total", "Total projects created")
 projects_updated_total = Counter("projects_updated_total", "Total projects updated")
 competences_created_total = Counter("competences_created_total", "Total competences created")
-portfolio_request_duration_seconds = Histogram("portfolio_request_duration_seconds", "Request duration for portfolio endpoints")
+portfolio_request_duration_seconds = Histogram(
+    "portfolio_request_duration_seconds", "Request duration for portfolio endpoints"
+)
 
 
 async def get_institutes_repository(
     session: AsyncSession = Depends(get_async_session),
-    kafka_producer: KafkaProducer = Depends(),
+    kafka_producer: KafkaProducerAdapter = Depends(get_kafka_producer),
 ) -> InstitutesRepository:
     """Dependency injection for institutes repository."""
     return InstitutesRepository(session, kafka_producer)
@@ -49,7 +52,7 @@ async def get_institutes_repository(
 
 async def get_projects_repository(
     session: AsyncSession = Depends(get_async_session),
-    kafka_producer: KafkaProducer = Depends(),
+    kafka_producer: KafkaProducerAdapter = Depends(get_kafka_producer),
 ) -> ProjectsRepository:
     """Dependency injection for projects repository."""
     return ProjectsRepository(session, kafka_producer)
@@ -57,7 +60,7 @@ async def get_projects_repository(
 
 async def get_competences_repository(
     session: AsyncSession = Depends(get_async_session),
-    kafka_producer: KafkaProducer = Depends(),
+    kafka_producer: KafkaProducerAdapter = Depends(get_kafka_producer),
 ) -> CompetencesRepository:
     """Dependency injection for competences repository."""
     return CompetencesRepository(session, kafka_producer)
@@ -65,7 +68,10 @@ async def get_competences_repository(
 
 async def get_current_user() -> dict:
     """Placeholder for ACL user extraction (Wave 3)."""
-    return {"id": UUID("00000000-0000-0000-0000-000000000001"), "tenant_id": UUID("00000000-0000-0000-0000-000000000001")}
+    return {
+        "id": UUID("00000000-0000-0000-0000-000000000001"),
+        "tenant_id": UUID("00000000-0000-0000-0000-000000000001"),
+    }
 
 
 async def require_portfolio_write():
@@ -81,7 +87,12 @@ async def require_portfolio_read():
 # ==================== Institutes ====================
 
 
-@router.post("/institutes", response_model=InstituteResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_portfolio_write)])
+@router.post(
+    "/institutes",
+    response_model=InstituteResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def create_institute(
     data: InstituteCreate,
@@ -91,8 +102,9 @@ async def create_institute(
     """Create a new institute."""
     from datetime import datetime
     from uuid import uuid4
+
     from app.domain.portfolio import Institute
-    
+
     institute = Institute(
         id=uuid4(),
         name=data.name,
@@ -106,17 +118,21 @@ async def create_institute(
         historico_atualizacoes=[],
         criado_por=current_user["id"],
         atualizado_por=current_user["id"],
-        criado_em=datetime.utcnow(),
-        atualizado_em=datetime.utcnow(),
+        criado_em=datetime.now(datetime.UTC),
+        atualizado_em=datetime.now(datetime.UTC),
     )
-    
+
     created = await repository.create(institute)
     institutes_created_total.inc()
-    
+
     return created
 
 
-@router.get("/institutes", response_model=InstituteListResponse, dependencies=[Depends(require_portfolio_read)])
+@router.get(
+    "/institutes",
+    response_model=InstituteListResponse,
+    dependencies=[Depends(require_portfolio_read)],
+)
 @portfolio_request_duration_seconds.time()
 async def list_institutes(
     status: Optional[InstituteStatus] = Query(None, description="Filter by status"),
@@ -134,11 +150,15 @@ async def list_institutes(
         skip=skip,
         limit=limit,
     )
-    
+
     return InstituteListResponse(items=institutes, total=total, skip=skip, limit=limit)
 
 
-@router.get("/institutes/{institute_id}", response_model=InstituteResponse, dependencies=[Depends(require_portfolio_read)])
+@router.get(
+    "/institutes/{institute_id}",
+    response_model=InstituteResponse,
+    dependencies=[Depends(require_portfolio_read)],
+)
 @portfolio_request_duration_seconds.time()
 async def get_institute(
     institute_id: UUID,
@@ -147,14 +167,18 @@ async def get_institute(
 ):
     """Get institute by ID."""
     institute = await repository.find_by_id(institute_id, current_user["tenant_id"])
-    
+
     if not institute:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Institute not found")
-    
+
     return institute
 
 
-@router.patch("/institutes/{institute_id}", response_model=InstituteResponse, dependencies=[Depends(require_portfolio_write)])
+@router.patch(
+    "/institutes/{institute_id}",
+    response_model=InstituteResponse,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def update_institute(
     institute_id: UUID,
@@ -164,7 +188,7 @@ async def update_institute(
 ):
     """Update institute."""
     updates = data.model_dump(exclude_unset=True, exclude={"motivo"})
-    
+
     updated = await repository.update(
         institute_id=institute_id,
         tenant_id=current_user["tenant_id"],
@@ -172,15 +196,19 @@ async def update_institute(
         updated_by=current_user["id"],
         motivo=data.motivo,
     )
-    
+
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Institute not found")
-    
+
     institutes_updated_total.inc()
     return updated
 
 
-@router.delete("/institutes/{institute_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_portfolio_write)])
+@router.delete(
+    "/institutes/{institute_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def delete_institute(
     institute_id: UUID,
@@ -195,7 +223,7 @@ async def delete_institute(
         deleted_by=current_user["id"],
         motivo=motivo,
     )
-    
+
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Institute not found")
 
@@ -203,7 +231,12 @@ async def delete_institute(
 # ==================== Projects ====================
 
 
-@router.post("/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_portfolio_write)])
+@router.post(
+    "/projects",
+    response_model=ProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def create_project(
     data: ProjectCreate,
@@ -213,8 +246,9 @@ async def create_project(
     """Create a new project."""
     from datetime import datetime
     from uuid import uuid4
+
     from app.domain.portfolio import Project
-    
+
     project = Project(
         id=uuid4(),
         institute_id=data.institute_id,
@@ -231,17 +265,19 @@ async def create_project(
         historico_atualizacoes=[],
         criado_por=current_user["id"],
         atualizado_por=current_user["id"],
-        criado_em=datetime.utcnow(),
-        atualizado_em=datetime.utcnow(),
+        criado_em=datetime.now(datetime.UTC),
+        atualizado_em=datetime.now(datetime.UTC),
     )
-    
+
     created = await repository.create(project)
     projects_created_total.inc()
-    
+
     return created
 
 
-@router.get("/projects", response_model=ProjectListResponse, dependencies=[Depends(require_portfolio_read)])
+@router.get(
+    "/projects", response_model=ProjectListResponse, dependencies=[Depends(require_portfolio_read)]
+)
 @portfolio_request_duration_seconds.time()
 async def list_projects(
     status: Optional[ProjectStatus] = Query(None, description="Filter by status"),
@@ -263,11 +299,15 @@ async def list_projects(
         skip=skip,
         limit=limit,
     )
-    
+
     return ProjectListResponse(items=projects, total=total, skip=skip, limit=limit)
 
 
-@router.get("/projects/{project_id}", response_model=ProjectResponse, dependencies=[Depends(require_portfolio_read)])
+@router.get(
+    "/projects/{project_id}",
+    response_model=ProjectResponse,
+    dependencies=[Depends(require_portfolio_read)],
+)
 @portfolio_request_duration_seconds.time()
 async def get_project(
     project_id: UUID,
@@ -276,14 +316,18 @@ async def get_project(
 ):
     """Get project by ID."""
     project = await repository.find_by_id(project_id, current_user["tenant_id"])
-    
+
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    
+
     return project
 
 
-@router.patch("/projects/{project_id}", response_model=ProjectResponse, dependencies=[Depends(require_portfolio_write)])
+@router.patch(
+    "/projects/{project_id}",
+    response_model=ProjectResponse,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def update_project(
     project_id: UUID,
@@ -293,7 +337,7 @@ async def update_project(
 ):
     """Update project."""
     updates = data.model_dump(exclude_unset=True, exclude={"motivo"})
-    
+
     updated = await repository.update(
         project_id=project_id,
         tenant_id=current_user["tenant_id"],
@@ -301,15 +345,19 @@ async def update_project(
         updated_by=current_user["id"],
         motivo=data.motivo,
     )
-    
+
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    
+
     projects_updated_total.inc()
     return updated
 
 
-@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_portfolio_write)])
+@router.delete(
+    "/projects/{project_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def delete_project(
     project_id: UUID,
@@ -324,7 +372,7 @@ async def delete_project(
         deleted_by=current_user["id"],
         motivo=motivo,
     )
-    
+
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
@@ -332,7 +380,12 @@ async def delete_project(
 # ==================== Competences ====================
 
 
-@router.post("/competences", response_model=CompetenceResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_portfolio_write)])
+@router.post(
+    "/competences",
+    response_model=CompetenceResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def create_competence(
     data: CompetenceCreate,
@@ -342,8 +395,9 @@ async def create_competence(
     """Create a new competence."""
     from datetime import datetime
     from uuid import uuid4
+
     from app.domain.portfolio import Competence
-    
+
     competence = Competence(
         id=uuid4(),
         name=data.name,
@@ -351,16 +405,20 @@ async def create_competence(
         description=data.description,
         tenant_id=current_user["tenant_id"],
         criado_por=current_user["id"],
-        criado_em=datetime.utcnow(),
+        criado_em=datetime.now(datetime.UTC),
     )
-    
+
     created = await repository.create(competence)
     competences_created_total.inc()
-    
+
     return created
 
 
-@router.get("/competences", response_model=CompetenceListResponse, dependencies=[Depends(require_portfolio_read)])
+@router.get(
+    "/competences",
+    response_model=CompetenceListResponse,
+    dependencies=[Depends(require_portfolio_read)],
+)
 @portfolio_request_duration_seconds.time()
 async def list_competences(
     category: Optional[str] = Query(None, description="Filter by category"),
@@ -376,11 +434,15 @@ async def list_competences(
         skip=skip,
         limit=limit,
     )
-    
+
     return CompetenceListResponse(items=competences, total=total, skip=skip, limit=limit)
 
 
-@router.get("/competences/{competence_id}", response_model=CompetenceResponse, dependencies=[Depends(require_portfolio_read)])
+@router.get(
+    "/competences/{competence_id}",
+    response_model=CompetenceResponse,
+    dependencies=[Depends(require_portfolio_read)],
+)
 @portfolio_request_duration_seconds.time()
 async def get_competence(
     competence_id: UUID,
@@ -389,14 +451,18 @@ async def get_competence(
 ):
     """Get competence by ID."""
     competence = await repository.find_by_id(competence_id, current_user["tenant_id"])
-    
+
     if not competence:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Competence not found")
-    
+
     return competence
 
 
-@router.delete("/competences/{competence_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_portfolio_write)])
+@router.delete(
+    "/competences/{competence_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_portfolio_write)],
+)
 @portfolio_request_duration_seconds.time()
 async def delete_competence(
     competence_id: UUID,
@@ -408,6 +474,6 @@ async def delete_competence(
         competence_id=competence_id,
         tenant_id=current_user["tenant_id"],
     )
-    
+
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Competence not found")

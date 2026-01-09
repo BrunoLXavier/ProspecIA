@@ -25,7 +25,7 @@ export function ClientsList() {
 
   const { data, isLoading } = useClients({ maturity: filterMaturity || undefined, limit: 100 });
 
-  const clients = useMemo(() => data?.items ?? [], [data]);
+  const clients = useMemo(() => data?.items ?? [], [data?.items]);
 
   const columns = [
     {

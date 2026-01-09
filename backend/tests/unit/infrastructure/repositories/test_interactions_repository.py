@@ -1,5 +1,5 @@
 """Unit tests for InteractionsRepository."""
-from datetime import datetime
+from datetime import datetime, UTC
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -39,14 +39,14 @@ def sample_interaction():
         title="Reunião de alinhamento técnico",
         description="Discussão sobre requisitos do projeto de IA",
         type=InteractionType.MEETING,
-        date=datetime.utcnow(),
+        date=datetime.now(UTC),
         participants=["João Silva", "Maria Santos", "Pedro Costa"],
         outcome=InteractionOutcome.POSITIVE,
         next_steps="Enviar proposta técnica até sexta-feira",
         status=InteractionStatus.COMPLETED,
         tenant_id=UUID("00000000-0000-0000-0000-000000000001"),
         criado_por=UUID("00000000-0000-0000-0000-000000000123"),
-        criado_em=datetime.utcnow(),
+        criado_em=datetime.now(UTC),
     )
 
 
@@ -138,13 +138,13 @@ class TestInteractionsRepositoryListByClient:
             title="Follow-up por email",
             description="Envio de proposta",
             type=InteractionType.EMAIL,
-            date=datetime.utcnow(),
+            date=datetime.now(UTC),
             participants=["Maria Santos"],
             outcome=InteractionOutcome.POSITIVE,
             status=InteractionStatus.COMPLETED,
             tenant_id=tenant_id,
             criado_por=UUID("00000000-0000-0000-0000-000000000123"),
-            criado_em=datetime.utcnow(),
+            criado_em=datetime.now(UTC),
         )
         
         interactions = [interaction2, interaction1]  # Ordered by date desc

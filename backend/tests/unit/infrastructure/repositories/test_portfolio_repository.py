@@ -1,5 +1,5 @@
 """Unit tests for Portfolio Repositories."""
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -50,8 +50,8 @@ def sample_institute():
         historico_atualizacoes=[],
         criado_por=UUID("00000000-0000-0000-0000-000000000123"),
         atualizado_por=UUID("00000000-0000-0000-0000-000000000123"),
-        criado_em=datetime.utcnow(),
-        atualizado_em=datetime.utcnow(),
+        criado_em=datetime.now(UTC),
+        atualizado_em=datetime.now(UTC),
     )
 
 
@@ -74,8 +74,8 @@ def sample_project(sample_institute):
         historico_atualizacoes=[],
         criado_por=UUID("00000000-0000-0000-0000-000000000123"),
         atualizado_por=UUID("00000000-0000-0000-0000-000000000123"),
-        criado_em=datetime.utcnow(),
-        atualizado_em=datetime.utcnow(),
+        criado_em=datetime.now(UTC),
+        atualizado_em=datetime.now(UTC),
     )
 
 
@@ -89,7 +89,7 @@ def sample_competence():
         description="Desenvolvimento de modelos supervisionados e não-supervisionados",
         tenant_id=UUID("00000000-0000-0000-0000-000000000001"),
         criado_por=UUID("00000000-0000-0000-0000-000000000123"),
-        criado_em=datetime.utcnow(),
+        criado_em=datetime.now(UTC),
     )
 
 

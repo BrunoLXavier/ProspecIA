@@ -6,6 +6,7 @@ proxy to the PostgreSQL adapter in `app.adapters.postgres.connection`.
 """
 
 from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.postgres.connection import (

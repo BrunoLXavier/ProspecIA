@@ -1,12 +1,25 @@
-"""Domain models package."""
+"""Domain models package.
 
-from app.domain.models.ingestao import Ingestao, IngestionStatus, IngestionMethod, IngestionSource
-from app.domain.models.consentimento import Consentimento
+Exports both legacy Portuguese names and English aliases to ensure
+readability while maintaining backward compatibility.
+"""
+
+# Primary exports (English names) with Portuguese aliases for backward compatibility
+from app.domain.models.consent import Consent, Consentimento
+from app.domain.models.ingestion import (
+    Ingestao,
+    Ingestion,
+    IngestionMethod,
+    IngestionSource,
+    IngestionStatus,
+)
 
 __all__ = [
+    "Ingestion",
     "Ingestao",
     "IngestionStatus",
     "IngestionMethod",
     "IngestionSource",
+    "Consent",
     "Consentimento",
 ]

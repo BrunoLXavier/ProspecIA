@@ -13,43 +13,40 @@ Wave 2 - RF-02
 
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-from prometheus_client import Counter, Histogram
 
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from prometheus_client import Counter, Histogram
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.adapters.kafka.producer import KafkaProducer, get_kafka_producer
+from app.domain.funding_source import FundingSourceStatus, FundingSourceType
+from app.infrastructure.database import get_db_session
+from app.infrastructure.repositories.funding_sources_repository import FundingSourcesRepository
 from app.interfaces.schemas.funding_sources import (
     FundingSourceCreate,
-    FundingSourceUpdate,
-    FundingSourceResponse,
-    FundingSourceListResponse,
-    FundingSourceListItem,
-    FundingSourceHistoryResponse,
     FundingSourceHistoryEntry,
+    FundingSourceHistoryResponse,
+    FundingSourceListItem,
+    FundingSourceListResponse,
+    FundingSourceResponse,
+    FundingSourceUpdate,
 )
-from app.domain.funding_source import FundingSourceStatus, FundingSourceType
-from app.infrastructure.repositories.funding_sources_repository import FundingSourcesRepository
-from app.infrastructure.database import get_db_session
-from app.adapters.kafka.producer import get_kafka_producer, KafkaProducer
-
 
 # Prometheus metrics
 funding_sources_created = Counter(
-    "funding_sources_created_total",
-    "Total number of funding sources created"
+    "funding_sources_created_total", "Total number of funding sources created"
 )
 funding_sources_updated = Counter(
-    "funding_sources_updated_total",
-    "Total number of funding sources updated"
+    "funding_sources_updated_total", "Total number of funding sources updated"
 )
 funding_sources_deleted = Counter(
-    "funding_sources_deleted_total",
-    "Total number of funding sources soft deleted"
+    "funding_sources_deleted_total", "Total number of funding sources soft deleted"
 )
 funding_sources_request_duration = Histogram(
     "funding_sources_request_duration_seconds",
     "Duration of funding sources API requests",
-    ["method", "endpoint"]
+    ["method", "endpoint"],
 )
 
 router = APIRouter(prefix="/funding-sources", tags=["Funding Sources"])
@@ -74,10 +71,14 @@ async def get_current_user() -> dict:
 async def require_funding_sources_read(user: dict = Depends(get_current_user)) -> dict:
     """Require read permission for funding_sources resource."""
     # TODO: Full ACL check via acl_rules table
-    if "admin" not in user["roles"] and "gestor" not in user["roles"] and "analista" not in user["roles"]:
+    if (
+        "admin" not in user["roles"]
+        and "gestor" not in user["roles"]
+        and "analista" not in user["roles"]
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to read funding sources"
+            detail="Insufficient permissions to read funding sources",
         )
     return user
 
@@ -88,7 +89,7 @@ async def require_funding_sources_write(user: dict = Depends(get_current_user)) 
     if "admin" not in user["roles"] and "gestor" not in user["roles"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to write funding sources"
+            detail="Insufficient permissions to write funding sources",
         )
     return user
 
@@ -98,7 +99,7 @@ async def require_funding_sources_write(user: dict = Depends(get_current_user)) 
     response_model=FundingSourceResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create funding source",
-    description="Create a new funding source with versioning and audit trail"
+    description="Create a new funding source with versioning and audit trail",
 )
 async def create_funding_source(
     data: FundingSourceCreate,
@@ -108,12 +109,12 @@ async def create_funding_source(
 ) -> FundingSourceResponse:
     """
     Create a new funding source.
-    
+
     Requires: admin or gestor role
     """
     with funding_sources_request_duration.labels(method="POST", endpoint="/funding-sources").time():
         repo = FundingSourcesRepository(session, kafka_producer)
-        
+
         try:
             entity = await repo.create(
                 name=data.name,
@@ -129,28 +130,27 @@ async def create_funding_source(
                 tenant_id=user["tenant_id"],
                 criado_por=user["id"],
             )
-            
+
             funding_sources_created.inc()
-            
+
             return FundingSourceResponse.model_validate(entity)
-        
+
         except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get(
     "",
     response_model=FundingSourceListResponse,
     summary="List funding sources",
-    description="List funding sources with pagination and filtering"
+    description="List funding sources with pagination and filtering",
 )
 async def list_funding_sources(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of records"),
-    status_filter: Optional[List[FundingSourceStatus]] = Query(None, description="Filter by status"),
+    status_filter: Optional[List[FundingSourceStatus]] = Query(
+        None, description="Filter by status"
+    ),
     type_filter: Optional[List[FundingSourceType]] = Query(None, description="Filter by type"),
     sector_filter: Optional[List[str]] = Query(None, description="Filter by sectors (any match)"),
     user: dict = Depends(require_funding_sources_read),
@@ -159,12 +159,12 @@ async def list_funding_sources(
 ) -> FundingSourceListResponse:
     """
     List funding sources with RLS filtering by tenant_id.
-    
+
     Requires: admin, gestor, or analista role
     """
     with funding_sources_request_duration.labels(method="GET", endpoint="/funding-sources").time():
         repo = FundingSourcesRepository(session, kafka_producer)
-        
+
         items = await repo.list(
             tenant_id=user["tenant_id"],
             skip=skip,
@@ -173,7 +173,7 @@ async def list_funding_sources(
             type_filter=type_filter,
             sector_filter=sector_filter,
         )
-        
+
         # Convert to list items (no history for performance)
         list_items = [
             FundingSourceListItem(
@@ -190,10 +190,10 @@ async def list_funding_sources(
             )
             for item in items
         ]
-        
+
         # TODO: Add total count query for pagination
         total = len(list_items)
-        
+
         return FundingSourceListResponse(
             items=list_items,
             total=total,
@@ -206,7 +206,7 @@ async def list_funding_sources(
     "/{funding_source_id}",
     response_model=FundingSourceResponse,
     summary="Get funding source by ID",
-    description="Get a single funding source with full details and audit trail"
+    description="Get a single funding source with full details and audit trail",
 )
 async def get_funding_source(
     funding_source_id: UUID,
@@ -216,24 +216,26 @@ async def get_funding_source(
 ) -> FundingSourceResponse:
     """
     Get funding source by ID with RLS filtering.
-    
+
     Requires: admin, gestor, or analista role
     """
-    with funding_sources_request_duration.labels(method="GET", endpoint="/funding-sources/{id}").time():
+    with funding_sources_request_duration.labels(
+        method="GET", endpoint="/funding-sources/{id}"
+    ).time():
         repo = FundingSourcesRepository(session, kafka_producer)
-        
+
         entity = await repo.find_by_id(
             funding_source_id=funding_source_id,
             tenant_id=user["tenant_id"],
             include_excluded=False,
         )
-        
+
         if not entity:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Funding source {funding_source_id} not found"
+                detail=f"Funding source {funding_source_id} not found",
             )
-        
+
         return FundingSourceResponse.model_validate(entity)
 
 
@@ -241,7 +243,7 @@ async def get_funding_source(
     "/{funding_source_id}",
     response_model=FundingSourceResponse,
     summary="Update funding source",
-    description="Update funding source with versioning (requires reason)"
+    description="Update funding source with versioning (requires reason)",
 )
 async def update_funding_source(
     funding_source_id: UUID,
@@ -252,23 +254,24 @@ async def update_funding_source(
 ) -> FundingSourceResponse:
     """
     Update funding source with versioning.
-    
+
     All changes are tracked in historico_atualizacoes.
     Requires: admin or gestor role
     """
-    with funding_sources_request_duration.labels(method="PATCH", endpoint="/funding-sources/{id}").time():
+    with funding_sources_request_duration.labels(
+        method="PATCH", endpoint="/funding-sources/{id}"
+    ).time():
         repo = FundingSourcesRepository(session, kafka_producer)
-        
+
         # Extract motivo and prepare updates dict
         motivo = data.motivo
         updates = data.model_dump(exclude={"motivo"}, exclude_none=True)
-        
+
         if not updates:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No fields to update"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update"
             )
-        
+
         try:
             entity = await repo.update(
                 funding_source_id=funding_source_id,
@@ -277,29 +280,26 @@ async def update_funding_source(
                 motivo=motivo,
                 atualizado_por=user["id"],
             )
-            
+
             if not entity:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Funding source {funding_source_id} not found"
+                    detail=f"Funding source {funding_source_id} not found",
                 )
-            
+
             funding_sources_updated.inc()
-            
+
             return FundingSourceResponse.model_validate(entity)
-        
+
         except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.delete(
     "/{funding_source_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Soft delete funding source",
-    description="Soft delete funding source (set status=excluded, never hard DELETE)"
+    description="Soft delete funding source (set status=excluded, never hard DELETE)",
 )
 async def delete_funding_source(
     funding_source_id: UUID,
@@ -310,25 +310,27 @@ async def delete_funding_source(
 ) -> None:
     """
     Soft delete funding source (Regra 11: never hard DELETE).
-    
+
     Requires: admin or gestor role
     """
-    with funding_sources_request_duration.labels(method="DELETE", endpoint="/funding-sources/{id}").time():
+    with funding_sources_request_duration.labels(
+        method="DELETE", endpoint="/funding-sources/{id}"
+    ).time():
         repo = FundingSourcesRepository(session, kafka_producer)
-        
+
         success = await repo.soft_delete(
             funding_source_id=funding_source_id,
             tenant_id=user["tenant_id"],
             motivo=motivo,
             atualizado_por=user["id"],
         )
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Funding source {funding_source_id} not found"
+                detail=f"Funding source {funding_source_id} not found",
             )
-        
+
         funding_sources_deleted.inc()
 
 
@@ -336,7 +338,7 @@ async def delete_funding_source(
     "/{funding_source_id}/history",
     response_model=FundingSourceHistoryResponse,
     summary="Get funding source history",
-    description="Get audit trail (historico_atualizacoes) for a funding source"
+    description="Get audit trail (historico_atualizacoes) for a funding source",
 )
 async def get_funding_source_history(
     funding_source_id: UUID,
@@ -346,29 +348,30 @@ async def get_funding_source_history(
 ) -> FundingSourceHistoryResponse:
     """
     Get funding source audit trail.
-    
+
     Requires: admin, gestor, or analista role
     """
-    with funding_sources_request_duration.labels(method="GET", endpoint="/funding-sources/{id}/history").time():
+    with funding_sources_request_duration.labels(
+        method="GET", endpoint="/funding-sources/{id}/history"
+    ).time():
         repo = FundingSourcesRepository(session, kafka_producer)
-        
+
         entity = await repo.find_by_id(
             funding_source_id=funding_source_id,
             tenant_id=user["tenant_id"],
             include_excluded=False,
         )
-        
+
         if not entity:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Funding source {funding_source_id} not found"
+                detail=f"Funding source {funding_source_id} not found",
             )
-        
+
         history_entries = [
-            FundingSourceHistoryEntry(**entry)
-            for entry in entity.historico_atualizacoes
+            FundingSourceHistoryEntry(**entry) for entry in entity.historico_atualizacoes
         ]
-        
+
         return FundingSourceHistoryResponse(
             funding_source_id=entity.id,
             name=entity.name,
