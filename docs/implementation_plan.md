@@ -723,4 +723,3 @@ curl http://localhost:8000/opportunities
 5. **Humano-no-Loop Obrigatório**: Nenhuma IA executa sem aprovação humana explícita
 6. **Transparência Radical**: Toda decisão IA expõe dados, método e confiança
 
----

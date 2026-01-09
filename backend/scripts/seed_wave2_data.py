@@ -115,6 +115,12 @@ async def seed_acl_rules(session: AsyncSession) -> None:
         ),
         ACLRule(
             resource="funding_sources",
+            action="hard_delete",
+            role="admin",
+            description="Permanently delete funding sources (admin only)",
+        ),
+        ACLRule(
+            resource="funding_sources",
             action="export",
             role="admin",
             description="Export funding sources to CSV",
@@ -169,6 +175,12 @@ async def seed_acl_rules(session: AsyncSession) -> None:
             description="Soft delete institutes",
         ),
         ACLRule(
+            resource="portfolio.institutes",
+            action="hard_delete",
+            role="admin",
+            description="Permanently delete institutes (admin only)",
+        ),
+        ACLRule(
             resource="portfolio.projects",
             action="create",
             role="admin",
@@ -197,6 +209,12 @@ async def seed_acl_rules(session: AsyncSession) -> None:
             action="exclude",
             role="admin",
             description="Soft delete projects",
+        ),
+        ACLRule(
+            resource="portfolio.projects",
+            action="hard_delete",
+            role="admin",
+            description="Permanently delete projects (admin only)",
         ),
         ACLRule(
             resource="portfolio.competences",
@@ -267,6 +285,12 @@ async def seed_acl_rules(session: AsyncSession) -> None:
         ),
         ACLRule(
             resource="clients",
+            action="hard_delete",
+            role="admin",
+            description="Permanently delete clients (admin only)",
+        ),
+        ACLRule(
+            resource="clients",
             action="export",
             role="admin",
             description="Export clients",
@@ -319,6 +343,12 @@ async def seed_acl_rules(session: AsyncSession) -> None:
             action="exclude",
             role="admin",
             description="Soft delete opportunities",
+        ),
+        ACLRule(
+            resource="pipeline",
+            action="hard_delete",
+            role="admin",
+            description="Permanently delete opportunities (admin only)",
         ),
         ACLRule(
             resource="pipeline",

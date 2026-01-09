@@ -39,6 +39,10 @@ class AclMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         method = request.method.upper()
 
+        # Allow CORS preflight requests (OPTIONS) to pass through
+        if method == "OPTIONS":
+            return await call_next(request)
+
         # Quick exemptions
         if any(path == p or path.startswith(p) for p in self.EXEMPT_PATHS):
             return await call_next(request)

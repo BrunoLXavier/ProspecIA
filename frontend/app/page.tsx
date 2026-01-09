@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useI18n } from '@/lib/hooks/useI18n'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
 
 export default function HomePage() {
   const { t } = useI18n()
@@ -11,7 +13,9 @@ export default function HomePage() {
     : 'http://localhost:8000/docs'
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start pt-6 sm:pt-12 lg:pt-24 px-6 sm:px-12 lg:px-24 pb-24">
+    <>
+      <Header />
+      <main className="flex min-h-screen flex-col items-center justify-start pt-6 sm:pt-12 lg:pt-24 px-6 sm:px-12 lg:px-24 pb-24">
       <div className="relative flex place-items-center mt-8">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-secondary-900 mb-4">
@@ -64,5 +68,7 @@ export default function HomePage() {
         </div>
       </div>
     </main>
+    <Footer />
+    </>
   )
 }

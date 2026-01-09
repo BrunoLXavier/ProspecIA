@@ -86,6 +86,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Raises:
             HTTPException: If authentication fails
         """
+        # Allow CORS preflight requests (OPTIONS) to pass through
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Check if JWT is required (feature flag)
         if not self.settings.FEATURE_JWT_REQUIRED:
             # Development mode: use mock user
